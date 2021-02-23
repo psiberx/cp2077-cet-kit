@@ -146,7 +146,6 @@ local function initialize()
 	end)
 
 	Observe('BraindanceGameController', 'OnIsActiveUpdated', function(braindanceActive)
-		print('OnIsActiveUpdated', braindanceActive)
 		updateBraindanceState(braindanceActive)
 		notifyObservers()
 	end)
