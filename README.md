@@ -1,4 +1,4 @@
-# Cyber Engine Tweaks Lua Kit
+# Lua Kit for Cyber Engine Tweaks
 
 ## Components
 
@@ -27,7 +27,7 @@ Current detections:
 - Braindance (Playback, Editing)
 - Photo Mode
 
-If you don't need UI state this helper can be effectively used to detect game loads / reloads / exit to main menu.
+If you don't need UI state this helper can be effectively used to detect game loads / exit to main menu.
 You can initialize mod state when the actual gameplay is started, and reset mod state, free resources when game session is ended.
 
 ## Samples
