@@ -141,7 +141,7 @@ local function initialize()
 		return a.value == b.value
 	end
 
-	-- Game state observers
+	-- Loading State Listeners
 
 	Observe('PlayerPuppet', 'OnDetach', function()
 		--print(('PlayerPuppet::OnDetach()'))
@@ -155,16 +155,7 @@ local function initialize()
 		end
 	end)
 
-	Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
-		--print(('SingleplayerMenuGameController::OnSavesReady()'))
-
-		updateLoading(false)
-		updateMenu(true)
-		updateBraindance(false)
-		updatePhotoMode(false)
-		updateSceneTier(4)
-		notifyObservers()
-	end)
+	-- Menu State Listeners
 
 	Observe('RadialWheelController', 'OnIsInMenuChanged', function(menuActive)
 		--print(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(menuActive)))
@@ -178,6 +169,19 @@ local function initialize()
 		notifyObservers()
 	end)
 
+	Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
+		--print(('SingleplayerMenuGameController::OnSavesReady()'))
+
+		updateLoading(false)
+		updateMenu(true)
+		updateBraindance(false)
+		updatePhotoMode(false)
+		updateSceneTier(4)
+		notifyObservers()
+	end)
+
+	-- Braindance State Listeners
+
 	Observe('BraindanceGameController', 'OnIsActiveUpdated', function(braindanceActive)
 		--print(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
 
@@ -185,12 +189,16 @@ local function initialize()
 		notifyObservers()
 	end)
 
+	-- Scene State Listeners
+
 	Observe('CrosshairGameController_NoWeapon', 'OnPSMSceneTierChanged', function(sceneTierValue)
 		--print(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
 
 		updateSceneTier(sceneTierValue)
 		notifyObservers()
 	end)
+
+	-- Photo Mode Listeners
 
 	Observe('gameuiPhotoModeMenuController', 'OnShow', function()
 		--print(('PhotoModeMenuController::OnShow()'))
@@ -205,6 +213,8 @@ local function initialize()
 		updatePhotoMode(false)
 		notifyObservers()
 	end)
+
+	-- UI Context Listeners
 
 	Observe('gameuiGameSystemUI', 'PushGameContext', function(self, newContext)
 		--print(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
@@ -248,6 +258,8 @@ local function initialize()
 		updateContext()
 		notifyObservers()
 	end)
+
+	-- Fast Travel Listeners
 
 	local fastTravelStart
 
