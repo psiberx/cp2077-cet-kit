@@ -25,6 +25,7 @@ Current detections:
 - Devices (Computers, Terminals)
 - Popups (Weapon Wheel, Phone, Call Vehicle)
 - Braindance (Playback, Editing)
+- Fast Travel
 - Photo Mode
 
 If you don't need UI state this helper can be effectively used to detect game loads / exit to main menu.
@@ -38,36 +39,39 @@ You can initialize mod state when the actual gameplay is started, and reset mod 
 local Cron = require('Cron')
 local GameUI = require('GameUI')
 
-local function time()
-	return os.date('%H:%M:%S')
-end
+local uiDemo = true
+local cronDemo = true
 
 registerForEvent('onInit', function()
-	-- Listen for state changes
-	-- See GameUI.PrintState() for all state props
-	GameUI.Observe(function(state)
-		GameUI.PrintState(state)
-	end)
+	if uiDemo then
+		-- Listen for state changes
+		-- See GameUI.PrintState() for all state props
+		GameUI.Observe(function(state)
+			GameUI.PrintState(state)
+		end)
+	end
 
-	print(('[%s] Cron demo started'):format(time()))
+	if cronDemo then
+		print(('[%s] Cron demo started'):format(os.date('%H:%M:%S')))
 
-	-- One-off timer
-	Cron.After(5.0, function()
-		print(('[%s] After 5.00 secs'):format(time()))
-	end)
+		-- One-off timer
+		Cron.After(5.0, function()
+			print(('[%s] After 5.00 secs'):format(os.date('%H:%M:%S')))
+		end)
 
-	-- Repeating self-halting timer with context
-	Cron.Every(2.0, { tick = 1 }, function(timer)
-		print(('[%s] Every %.2f secs #%d'):format(time(), timer.interval, timer.tick))
+		-- Repeating self-halting timer with context
+		Cron.Every(2.0, { tick = 1 }, function(timer)
+			print(('[%s] Every %.2f secs #%d'):format(os.date('%H:%M:%S'), timer.interval, timer.tick))
 
-		if timer.tick < 5 then
-			timer.tick = timer.tick + 1
-		else
-			timer:Halt() -- or Cron.Halt(timer)
+			if timer.tick < 5 then
+				timer.tick = timer.tick + 1
+			else
+				timer:Halt() -- or Cron.Halt(timer)
 
-			print(('[%s] Stopped after %.2f secs / %d ticks'):format(time(), timer.interval * timer.tick, timer.tick))
-		end
-	end)
+				print(('[%s] Stopped after %.2f secs / %d ticks'):format(os.date('%H:%M:%S'), timer.interval * timer.tick, timer.tick))
+			end
+		end)
+	end
 end)
 
 registerForEvent('onUpdate', function(delta)
