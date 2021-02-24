@@ -52,22 +52,20 @@ registerForEvent('onInit', function()
 	print(('[%s] Cron demo started'):format(time()))
 
 	-- One-off timer
-	Cron.After(1.0, function()
-		print(('[%s] After 1 sec'):format(time()))
+	Cron.After(5.0, function()
+		print(('[%s] After 5.00 secs'):format(time()))
 	end)
 
 	-- Repeating self-halting timer with context
 	Cron.Every(2.0, { tick = 1 }, function(timer)
-		print(('[%s] Every %.1f secs #%d'):format(time(), timer.interval, timer.tick))
+		print(('[%s] Every %.2f secs #%d'):format(time(), timer.interval, timer.tick))
 
 		if timer.tick < 5 then
 			timer.tick = timer.tick + 1
 		else
-			local elapsedTime = timer.tick * timer.interval
+			timer:Halt() -- or Cron.Halt(timer)
 
-			print(('[%s] Stopped after %.1f secs / %d ticks'):format(time(), elapsedTime, timer.tick))
-
-			Cron.Halt(timer)
+			print(('[%s] Stopped after %.2f secs / %d ticks'):format(time(), timer.interval * timer.tick, timer.tick))
 		end
 	end)
 end)
