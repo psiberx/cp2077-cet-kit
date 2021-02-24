@@ -38,7 +38,7 @@ You can display own HUD elements and other contextual elements depending on the 
 If you don't need UI this helper also can be effectively used to detect game loads / exit to main menu.
 You can initialize mod state when the actual gameplay starts, and reset mod state, free resources when the game session ends.
 
-## Samples
+## Examples
 
 ### Cron + GameUI Demo
 
@@ -117,3 +117,23 @@ registerForEvent('onInit', function()
     end)
 end)
 ```
+
+## Extras
+
+More examples unrelated to this particular kit.
+
+### Read player actions / inputs
+
+https://gist.github.com/psiberx/0e94bc93ed40a70a93a410734a5f5ade
+
+### Create custom map pins
+
+https://gist.github.com/psiberx/50bcf9368cfeff5937de1a1ed815bdb1
+
+### Summon any vehicle  
+
+https://gist.github.com/psiberx/01c656eae15d84c78d3e097caf22e808
+
+### Fix Dead-Eye with TweakDB 
+
+https://gist.github.com/psiberx/e434c2d03bec65780e524d691afe5c81
