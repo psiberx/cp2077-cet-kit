@@ -18,6 +18,9 @@ See `GameUI.PrintState()` for all state properties
 local GameUI = {}
 
 local isInitialized = false
+local notifiedState = { _ = false }
+local observers = {}
+
 local isLoading = false
 local isLoaded = false
 local isMenu = true
@@ -26,8 +29,22 @@ local isFastTravel = false
 local isPhotoMode = false
 local sceneTier = 4
 local contextStack = {}
-local notifiedState = { isInitialized = false }
-local observers = {}
+
+local stateProps = {
+	'isLoading',
+	'isLoaded',
+	'isMenu',
+	'isMainMenu',
+	'isScene',
+	'isBraindance',
+	'isFastTravel',
+	'isDefault',
+	'isScanner',
+	'isPopup',
+	'isDevice',
+	'isPhoto',
+	'context',
+}
 
 local function updateLoading(loading)
 	isLoading = loading
@@ -390,52 +407,76 @@ function GameUI.GetState()
 	return state
 end
 
-function GameUI.PrintState(state)
-	print('[UI State]')
+function GameUI.ExportState(state)
+	local export = {}
 
-	if state.isLoading then
-		print('- Loading:', state.isLoading)
-	elseif state.isLoaded then
-		print('- Loaded:', state.isLoaded)
+	for _, prop in ipairs(stateProps) do
+		local value = state[prop]
+
+		if value then
+			if type(value) == 'userdata' then
+				value = 'GameUI.Context.' .. value.value
+			else
+				value = tostring(value)
+			end
+
+			table.insert(export, prop .. ' = ' .. value)
+		end
 	end
 
-	if state.isMenu then
-		print('- Menu:', state.isMenu, state.isMainMenu and '(Main Menu)' or '')
-	end
+	return '{ ' .. table.concat(export, ', ') .. ' }'
+end
 
-	if state.isScene then
-		print('- Scene:', state.isScene)
-	end
+function GameUI.PrintState(state, expanded, all)
+	if expanded then
+		print('[UI State]')
 
-	if state.isBraindance then
-		print('- Braindance:', state.isBraindance)
-	end
+		if state.isLoading then
+			print('- Loading:', state.isLoading)
+		elseif state.isLoaded then
+			print('- Loaded:', state.isLoaded)
+		end
 
-	if state.isFastTravel then
-		print('- Fast Travel:', state.isFastTravel)
-	end
+		if state.isMenu or all then
+			print('- Menu:', state.isMenu, state.isMainMenu and '(Main Menu)' or '')
+		end
 
-	if state.isDefault then
-		print('- Default:', state.isDefault)
-	end
+		if state.isScene or all then
+			print('- Scene:', state.isScene)
+		end
 
-	if state.isScanner then
-		print('- Scanner:', state.isScanner)
-	end
+		if state.isBraindance or all then
+			print('- Braindance:', state.isBraindance)
+		end
 
-	if state.isPopup then
-		print('- Popup:', state.isPopup)
-	end
+		if state.isFastTravel or all then
+			print('- Fast Travel:', state.isFastTravel)
+		end
 
-	if state.isDevice then
-		print('- Device:', state.isDevice)
-	end
+		if state.isDefault or all then
+			print('- Default:', state.isDefault)
+		end
 
-	if state.isPhoto then
-		print('- Photo:', state.isPhoto)
-	end
+		if state.isScanner or all then
+			print('- Scanner:', state.isScanner)
+		end
 
-	print('- Context:', state.context)
+		if state.isPopup or all then
+			print('- Popup:', state.isPopup)
+		end
+
+		if state.isDevice or all then
+			print('- Device:', state.isDevice)
+		end
+
+		if state.isPhoto or all then
+			print('- Photo:', state.isPhoto)
+		end
+
+		print('- Context:', state.context)
+	else
+		print('[UI State] ' .. GameUI.ExportState(state))
+	end
 end
 
 return GameUI
