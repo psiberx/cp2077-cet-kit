@@ -22,6 +22,7 @@ local isLoading = false
 local isLoaded = false
 local isMenu = true
 local isBraindance = false
+local isFastTravel = false
 local isPhotoMode = false
 local sceneTier = 4
 local contextStack = {}
@@ -46,6 +47,10 @@ end
 
 local function updateBraindance(braindanceActive)
 	isBraindance = braindanceActive
+end
+
+local function updateFastTravel(fastTravelActive)
+	isFastTravel = fastTravelActive
 end
 
 local function updatePhotoMode(photoModeActive)
@@ -139,7 +144,7 @@ local function initialize()
 	-- Game state observers
 
 	Observe('PlayerPuppet', 'OnDetach', function()
-		--spdlog.info(('PlayerPuppet::OnDetach()'))
+		--print(('PlayerPuppet::OnDetach()'))
 
 		if isMenu then
 			updateLoading(true)
@@ -151,7 +156,7 @@ local function initialize()
 	end)
 
 	Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
-		--spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))
+		--print(('SingleplayerMenuGameController::OnSavesReady()'))
 
 		updateLoading(false)
 		updateMenu(true)
@@ -162,7 +167,7 @@ local function initialize()
 	end)
 
 	Observe('RadialWheelController', 'OnIsInMenuChanged', function(menuActive)
-		--spdlog.info(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(menuActive)))
+		--print(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(menuActive)))
 
 		updateMenu(menuActive)
 
@@ -174,35 +179,35 @@ local function initialize()
 	end)
 
 	Observe('BraindanceGameController', 'OnIsActiveUpdated', function(braindanceActive)
-		--spdlog.info(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
+		--print(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
 
 		updateBraindance(braindanceActive)
 		notifyObservers()
 	end)
 
 	Observe('CrosshairGameController_NoWeapon', 'OnPSMSceneTierChanged', function(sceneTierValue)
-		--spdlog.info(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
+		--print(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
 
 		updateSceneTier(sceneTierValue)
 		notifyObservers()
 	end)
 
 	Observe('gameuiPhotoModeMenuController', 'OnShow', function()
-		--spdlog.info(('PhotoModeMenuController::OnShow()'))
+		--print(('PhotoModeMenuController::OnShow()'))
 
 		updatePhotoMode(true)
 		notifyObservers()
 	end)
 
 	Observe('gameuiPhotoModeMenuController', 'OnHide', function()
-		--spdlog.info(('PhotoModeMenuController::OnHide()'))
+		--print(('PhotoModeMenuController::OnHide()'))
 
 		updatePhotoMode(false)
 		notifyObservers()
 	end)
 
 	Observe('gameuiGameSystemUI', 'PushGameContext', function(self, newContext)
-		--spdlog.info(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
+		--print(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
 
 		if isBraindance and newContext.value == GameUI.Context.Scanning.value then
 			return
@@ -213,7 +218,7 @@ local function initialize()
 	end)
 
 	Observe('gameuiGameSystemUI', 'PopGameContext', function(self, oldContext)
-		--spdlog.info(('GameSystemUI::PopGameContext(%q)'):format(tostring(oldContext)))
+		--print(('GameSystemUI::PopGameContext(%q)'):format(tostring(oldContext)))
 
 		if isBraindance and oldContext.value == GameUI.Context.Scanning.value then
 			return
@@ -224,7 +229,7 @@ local function initialize()
 	end)
 
 	Observe('gameuiGameSystemUI', 'SwapGameContext', function(self, oldContext, newContext)
-		--spdlog.info(('GameSystemUI::SwapGameContext(%q, %q)'):format(tostring(oldContext), tostring(newContext)))
+		--print(('GameSystemUI::SwapGameContext(%q, %q)'):format(tostring(oldContext), tostring(newContext)))
 
 		-- bugfix: new context is broken
 		if oldContext.value == GameUI.Context.Scanning.value then
@@ -238,10 +243,40 @@ local function initialize()
 	end)
 
 	Observe('gameuiGameSystemUI', 'ResetGameContext', function()
-		--spdlog.info(('GameSystemUI::ResetGameContext()'))
+		--print(('GameSystemUI::ResetGameContext()'))
 
 		updateContext()
 		notifyObservers()
+	end)
+
+	local fastTravelStart
+
+	Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(request)
+		--print(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
+
+		if request.isEnabled then
+			fastTravelStart = request.pointRecord
+		end
+	end)
+
+	Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(request)
+		--print(('FastTravelSystem::OnPerformFastTravelRequest()'))
+
+		local fastTravelDestination = request.pointData.pointRecord
+
+		if tostring(fastTravelStart) ~= tostring(fastTravelDestination) then
+			updateFastTravel(true)
+		end
+	end)
+
+	Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(finished)
+		--print(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
+
+		if finished then
+			updateFastTravel(false)
+			refreshCurrentState()
+			notifyObservers()
+		end
 	end)
 
 	-- Initial state
@@ -277,11 +312,11 @@ function GameUI.IsMainMenu()
 end
 
 function GameUI.IsAnyMenu()
-	return isMenu
+	return isMenu or isFastTravel
 end
 
 function GameUI.IsScene()
-	return sceneTier > 2
+	return sceneTier > 2 and not GameUI.IsMainMenu()
 end
 
 function GameUI.IsScanner()
@@ -306,6 +341,10 @@ function GameUI.IsBraindance()
 	return isBraindance
 end
 
+function GameUI.IsFastTravel()
+	return isFastTravel
+end
+
 function GameUI.IsPhoto()
 	return isPhotoMode
 end
@@ -324,13 +363,15 @@ function GameUI.GetState()
 	state.isMainMenu = GameUI.IsMainMenu()
 	state.isScene = GameUI.IsScene()
 	state.isBraindance = GameUI.IsBraindance()
+	state.isFastTravel = GameUI.IsFastTravel()
 	state.isScanner = GameUI.IsScanner()
 	state.isPopup = GameUI.IsPopup()
 	state.isDevice = GameUI.IsDevice()
 	state.isPhoto = GameUI.IsPhoto()
 
-	state.isDefault = not state.isMenu and not state.isScene and not state.isPhoto
-		and not state.isScanner and not state.isPopup and not state.isDevice and not state.isBraindance
+	state.isDefault = not state.isMenu and not state.isScene
+		and not state.isBraindance and not state.isFastTravel and not state.isPhoto
+		and not state.isScanner and not state.isPopup and not state.isDevice
 
 	state.context = GameUI.GetContext()
 
@@ -356,6 +397,10 @@ function GameUI.PrintState(state)
 
 	if state.isBraindance then
 		print('- Braindance:', state.isBraindance)
+	end
+
+	if state.isFastTravel then
+		print('- Fast Travel:', state.isFastTravel)
 	end
 
 	if state.isDefault then
