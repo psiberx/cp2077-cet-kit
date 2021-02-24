@@ -25,24 +25,15 @@ local isBraindance = false
 local isPhotoMode = false
 local sceneTier = 4
 local contextStack = {}
+local notifiedState = { isInitialized = false }
 local observers = {}
 
-local function notifyObservers()
-	for _, callback in ipairs(observers) do
-		callback(GameUI.GetState())
-	end
-
-	if isLoaded then
-		isLoaded = false
-	end
-end
-
-local function updateLoadingState(loadingState)
-	isLoading = loadingState
+local function updateLoading(loading)
+	isLoading = loading
 	isLoaded = false
 end
 
-local function updateMenuState(menuActive)
+local function updateMenu(menuActive)
 	isMenu = menuActive or GameUI.IsMainMenu()
 
 	if isLoading then
@@ -53,19 +44,19 @@ local function updateMenuState(menuActive)
 	end
 end
 
-local function updateBraindanceState(braindanceActive)
+local function updateBraindance(braindanceActive)
 	isBraindance = braindanceActive
 end
 
-local function updatePhotoModeState(photoModeActive)
+local function updatePhotoMode(photoModeActive)
 	isPhotoMode = photoModeActive
 end
 
-local function updateSceneTierState(sceneTierValue)
+local function updateSceneTier(sceneTierValue)
 	sceneTier = sceneTierValue -- gamePSMHighLevel?
 end
 
-local function updateContext(oldContext, newContext)
+local function updateContex(oldContext, newContext)
 	if oldContext == nil and newContext == nil then
 		contextStack = {}
 	else
@@ -95,10 +86,36 @@ local function refreshCurrentState()
 	local blackboardPM = Game.GetBlackboardSystem():Get(blackboardDefs.PhotoMode)
 	local blackboardPSM = Game.GetBlackboardSystem():GetLocalInstanced(playerId, blackboardDefs.PlayerStateMachine)
 
-	updateMenuState(blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu))
-	updateBraindanceState(blackboardBD:GetBool(blackboardDefs.Braindance.IsActive))
-	updatePhotoModeState(blackboardPM:GetBool(blackboardDefs.PhotoMode.IsActive))
-	updateSceneTierState(blackboardPSM:GetInt(blackboardDefs.PlayerStateMachine.SceneTier))
+	updateMenu(blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu))
+	updateBraindance(blackboardBD:GetBool(blackboardDefs.Braindance.IsActive))
+	updatePhotoMode(blackboardPM:GetBool(blackboardDefs.PhotoMode.IsActive))
+	updateSceneTier(blackboardPSM:GetInt(blackboardDefs.PlayerStateMachine.SceneTier))
+end
+
+local function notifyObservers()
+	local currentState = GameUI.GetState()
+	local stateChanged = false
+
+	for stateProp, notifiedValue in pairs(notifiedState) do
+		local currentValue = currentState[stateProp]
+
+		if tostring(notifiedValue) ~= tostring(currentValue) then
+			stateChanged = true
+			break
+		end
+	end
+
+	if stateChanged then
+		for _, callback in ipairs(observers) do
+			callback(currentState)
+		end
+
+		if isLoaded then
+			isLoaded = false
+		end
+
+		notifiedState = currentState
+	end
 end
 
 local function initialize()
@@ -123,55 +140,57 @@ local function initialize()
 
 	Observe('PlayerPuppet', 'OnDetach', function()
 		if isMenu then
-			updateLoadingState(true)
+			updateLoading(true)
 			notifyObservers()
 		end
 	end)
 
 	Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
-		updateLoadingState(false)
-		updateMenuState(true)
-		updateBraindanceState(false)
-		updatePhotoModeState(false)
-		updateSceneTierState(4)
+		updateLoading(false)
+		updateMenu(true)
+		updateBraindance(false)
+		updatePhotoMode(false)
+		updateSceneTier(4)
 		notifyObservers()
 	end)
 
 	Observe('RadialWheelController', 'OnIsInMenuChanged', function(menuActive)
-		updateMenuState(menuActive)
+		updateMenu(menuActive)
+
 		if isLoaded then
 			refreshCurrentState()
 		end
+
 		notifyObservers()
 	end)
 
 	Observe('BraindanceGameController', 'OnIsActiveUpdated', function(braindanceActive)
-		updateBraindanceState(braindanceActive)
+		updateBraindance(braindanceActive)
 		notifyObservers()
 	end)
 
 	Observe('CrosshairGameController_NoWeapon', 'OnPSMSceneTierChanged', function(sceneTierValue)
-		updateSceneTierState(sceneTierValue)
+		updateSceneTier(sceneTierValue)
 		notifyObservers()
 	end)
 
 	Observe('gameuiPhotoModeMenuController', 'OnShow', function()
-		updatePhotoModeState(true)
+		updatePhotoMode(true)
 		notifyObservers()
 	end)
 
 	Observe('gameuiPhotoModeMenuController', 'OnHide', function()
-		updatePhotoModeState(false)
+		updatePhotoMode(false)
 		notifyObservers()
 	end)
 
 	Observe('gameuiGameSystemUI', 'PushGameContext', function(self, newContext)
-		updateContext(nil, newContext)
+		updateContex(nil, newContext)
 		notifyObservers()
 	end)
 
 	Observe('gameuiGameSystemUI', 'PopGameContext', function(self, oldContext)
-		updateContext(oldContext, nil)
+		updateContex(oldContext, nil)
 		notifyObservers()
 	end)
 
@@ -183,12 +202,12 @@ local function initialize()
 			newContext = GameUI.Context.Scanning
 		end
 
-		updateContext(oldContext, newContext)
+		updateContex(oldContext, newContext)
 		notifyObservers()
 	end)
 
 	Observe('gameuiGameSystemUI', 'ResetGameContext', function()
-		updateContext()
+		updateContex()
 		notifyObservers()
 	end)
 
