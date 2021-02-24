@@ -56,7 +56,7 @@ local function updateSceneTier(sceneTierValue)
 	sceneTier = sceneTierValue -- gamePSMHighLevel?
 end
 
-local function updateContex(oldContext, newContext)
+local function updateContext(oldContext, newContext)
 	if oldContext == nil and newContext == nil then
 		contextStack = {}
 	else
@@ -139,13 +139,20 @@ local function initialize()
 	-- Game state observers
 
 	Observe('PlayerPuppet', 'OnDetach', function()
+		--spdlog.info(('PlayerPuppet::OnDetach()'))
+
 		if isMenu then
 			updateLoading(true)
+			updateBraindance(false)
+			updatePhotoMode(false)
+			updateContext()
 			notifyObservers()
 		end
 	end)
 
 	Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
+		--spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))
+
 		updateLoading(false)
 		updateMenu(true)
 		updateBraindance(false)
@@ -155,6 +162,8 @@ local function initialize()
 	end)
 
 	Observe('RadialWheelController', 'OnIsInMenuChanged', function(menuActive)
+		--spdlog.info(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(menuActive)))
+
 		updateMenu(menuActive)
 
 		if isLoaded then
@@ -165,36 +174,58 @@ local function initialize()
 	end)
 
 	Observe('BraindanceGameController', 'OnIsActiveUpdated', function(braindanceActive)
+		--spdlog.info(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
+
 		updateBraindance(braindanceActive)
 		notifyObservers()
 	end)
 
 	Observe('CrosshairGameController_NoWeapon', 'OnPSMSceneTierChanged', function(sceneTierValue)
+		--spdlog.info(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
+
 		updateSceneTier(sceneTierValue)
 		notifyObservers()
 	end)
 
 	Observe('gameuiPhotoModeMenuController', 'OnShow', function()
+		--spdlog.info(('PhotoModeMenuController::OnShow()'))
+
 		updatePhotoMode(true)
 		notifyObservers()
 	end)
 
 	Observe('gameuiPhotoModeMenuController', 'OnHide', function()
+		--spdlog.info(('PhotoModeMenuController::OnHide()'))
+
 		updatePhotoMode(false)
 		notifyObservers()
 	end)
 
 	Observe('gameuiGameSystemUI', 'PushGameContext', function(self, newContext)
-		updateContex(nil, newContext)
+		--spdlog.info(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
+
+		if isBraindance and newContext.value == GameUI.Context.Scanning.value then
+			return
+		end
+
+		updateContext(nil, newContext)
 		notifyObservers()
 	end)
 
 	Observe('gameuiGameSystemUI', 'PopGameContext', function(self, oldContext)
-		updateContex(oldContext, nil)
+		--spdlog.info(('GameSystemUI::PopGameContext(%q)'):format(tostring(oldContext)))
+
+		if isBraindance and oldContext.value == GameUI.Context.Scanning.value then
+			return
+		end
+
+		updateContext(oldContext, nil)
 		notifyObservers()
 	end)
 
 	Observe('gameuiGameSystemUI', 'SwapGameContext', function(self, oldContext, newContext)
+		--spdlog.info(('GameSystemUI::SwapGameContext(%q, %q)'):format(tostring(oldContext), tostring(newContext)))
+
 		-- bugfix: new context is broken
 		if oldContext.value == GameUI.Context.Scanning.value then
 			newContext = GameUI.Context.QuickHack
@@ -202,12 +233,14 @@ local function initialize()
 			newContext = GameUI.Context.Scanning
 		end
 
-		updateContex(oldContext, newContext)
+		updateContext(oldContext, newContext)
 		notifyObservers()
 	end)
 
 	Observe('gameuiGameSystemUI', 'ResetGameContext', function()
-		updateContex()
+		--spdlog.info(('GameSystemUI::ResetGameContext()'))
+
+		updateContext()
 		notifyObservers()
 	end)
 
@@ -290,10 +323,10 @@ function GameUI.GetState()
 	state.isMenu = GameUI.IsAnyMenu()
 	state.isMainMenu = GameUI.IsMainMenu()
 	state.isScene = GameUI.IsScene()
+	state.isBraindance = GameUI.IsBraindance()
 	state.isScanner = GameUI.IsScanner()
 	state.isPopup = GameUI.IsPopup()
 	state.isDevice = GameUI.IsDevice()
-	state.isBraindance = GameUI.IsBraindance()
 	state.isPhoto = GameUI.IsPhoto()
 
 	state.isDefault = not state.isMenu and not state.isScene and not state.isPhoto
@@ -321,6 +354,10 @@ function GameUI.PrintState(state)
 		print('- Scene:', state.isScene)
 	end
 
+	if state.isBraindance then
+		print('- Braindance:', state.isBraindance)
+	end
+
 	if state.isDefault then
 		print('- Default:', state.isDefault)
 	end
@@ -335,10 +372,6 @@ function GameUI.PrintState(state)
 
 	if state.isDevice then
 		print('- Device:', state.isDevice)
-	end
-
-	if state.isBraindance then
-		print('- Braindance:', state.isBraindance)
 	end
 
 	if state.isPhoto then
