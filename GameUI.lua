@@ -428,55 +428,56 @@ function GameUI.ExportState(state)
 end
 
 function GameUI.PrintState(state, expanded, all)
-	if expanded then
-		print('[UI State]')
-
-		if state.isLoading then
-			print('- Loading:', state.isLoading)
-		elseif state.isLoaded then
-			print('- Loaded:', state.isLoaded)
-		end
-
-		if state.isMenu or all then
-			print('- Menu:', state.isMenu, state.isMainMenu and '(Main Menu)' or '')
-		end
-
-		if state.isScene or all then
-			print('- Scene:', state.isScene)
-		end
-
-		if state.isBraindance or all then
-			print('- Braindance:', state.isBraindance)
-		end
-
-		if state.isFastTravel or all then
-			print('- Fast Travel:', state.isFastTravel)
-		end
-
-		if state.isDefault or all then
-			print('- Default:', state.isDefault)
-		end
-
-		if state.isScanner or all then
-			print('- Scanner:', state.isScanner)
-		end
-
-		if state.isPopup or all then
-			print('- Popup:', state.isPopup)
-		end
-
-		if state.isDevice or all then
-			print('- Device:', state.isDevice)
-		end
-
-		if state.isPhoto or all then
-			print('- Photo:', state.isPhoto)
-		end
-
-		print('- Context:', state.context)
-	else
+	if not expanded then
 		print('[UI State] ' .. GameUI.ExportState(state))
+		return
 	end
+
+	print('[UI State]')
+
+	if state.isLoading then
+		print('- Loading:', state.isLoading)
+	elseif state.isLoaded then
+		print('- Loaded:', state.isLoaded)
+	end
+
+	if state.isMenu or all then
+		print('- Menu:', state.isMenu, state.isMainMenu and '(Main Menu)' or '')
+	end
+
+	if state.isScene or all then
+		print('- Scene:', state.isScene)
+	end
+
+	if state.isBraindance or all then
+		print('- Braindance:', state.isBraindance)
+	end
+
+	if state.isFastTravel or all then
+		print('- Fast Travel:', state.isFastTravel)
+	end
+
+	if state.isDefault or all then
+		print('- Default:', state.isDefault)
+	end
+
+	if state.isScanner or all then
+		print('- Scanner:', state.isScanner)
+	end
+
+	if state.isPopup or all then
+		print('- Popup:', state.isPopup)
+	end
+
+	if state.isDevice or all then
+		print('- Device:', state.isDevice)
+	end
+
+	if state.isPhoto or all then
+		print('- Photo:', state.isPhoto)
+	end
+
+	print('- Context:', state.context)
 end
 
 return GameUI
