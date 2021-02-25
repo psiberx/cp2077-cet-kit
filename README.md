@@ -41,7 +41,7 @@ You can display own HUD elements and apply contextual logic depending on the cur
 If you don't need UI this module also can be used effectively to detect game loads.
 You can initialize mod state when the actual gameplay starts, and reset mod state, free resources when the game session ends.
 
-## How To Use
+## How to use
 
 ### Cron Tasks
 
@@ -113,11 +113,11 @@ end)
 
 ## Examples
 
-- [Minimap HUD extension with current player location](https://gist.github.com/psiberx/6a04862a17b35745dd4602f826b45245)  
+- [Minimap HUD extension](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/whereami/init.lua)  
   Uses `GameUI` to determine when to show or hide the widget.  
   The widget is visible only on the default in-game HUD.  
   ![WhereAmI](https://siberx.dev/cp2077-cet-demos/whereami-210223.jpg)
-- [Read player actions / inputs](https://gist.github.com/psiberx/0e94bc93ed40a70a93a410734a5f5ade)
-- [Create custom map pins](https://gist.github.com/psiberx/50bcf9368cfeff5937de1a1ed815bdb1)
-- [Call any vehicle with Vehicle System](https://gist.github.com/psiberx/01c656eae15d84c78d3e097caf22e808)  
-- [Fix Dead-Eye with TweakDB](https://gist.github.com/psiberx/e434c2d03bec65780e524d691afe5c81)
+- [Read player actions / inputs](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/player-actions/init.lua)
+- [Create custom map pins](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/mappin-system/init.lua)
+- [Call any vehicle with Vehicle System](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/vehicle-system/init.lua)  
+- [Fix Dead-Eye with TweakDB](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/dead-eye-fix/init.lua)
