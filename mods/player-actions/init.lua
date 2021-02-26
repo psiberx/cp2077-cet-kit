@@ -3,10 +3,12 @@ An example of reading player actions / inputs
 ]]
 
 registerForEvent('onInit', function()
+	local ListenerAction = GetSingleton('gameinputScriptListenerAction')
+
 	Observe('PlayerPuppet', 'OnAction', function(action)
-		local actionName = Game.NameToString(action:GetName(action))
-		local actionType = action:GetType(action).value -- gameinputActionType
-		local actionValue = action:GetValue(action)
+		local actionName = Game.NameToString(ListenerAction:GetName(action))
+		local actionType = ListenerAction:GetType(action).value -- gameinputActionType
+		local actionValue = ListenerAction:GetValue(action)
 
 		if actionName == 'Forward' or actionName == 'Back' then
 			if actionType == 'BUTTON_PRESSED' then
@@ -36,8 +38,10 @@ end)
 Simple observer to see all player actions (including mouse and camera moves)
 
 registerForEvent('onInit', function()
+	local ListenerAction = GetSingleton('gameinputScriptListenerAction')
+
 	Observe('PlayerPuppet', 'OnAction', function(action)
-		print('[Action]', Game.NameToString(action:GetName(action)), action:GetType(action).value, action:GetValue(action))
+		print('[Action]', Game.NameToString(ListenerAction:GetName(action)), ListenerAction:GetType(action).value, ListenerAction:GetValue(action))
 	end)
 end)
 ]]
