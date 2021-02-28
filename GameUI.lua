@@ -67,7 +67,7 @@ GameUI.Camera = {
 
 local initialized = {}
 local listeners = {}
-local previousState = { menu = false }
+local previousState = { isDetached = true, menu = false }
 
 local isDetached = true
 local isLoaded = false
@@ -456,14 +456,6 @@ local function initialize(event)
 			end)
 		end
 
-		--Observe('DropPointControllerPS', 'OnOpenVendorUI', function()
-		--	--spdlog.info(('DropPointControllerPS::OnOpenVendorUI()'))
-		--
-		--	updateMenuScenario('MenuScenario_Vendor')
-		--	updateMenuItem('DropPoint')
-		--	notifyObservers()
-		--end)
-
 		Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
 			--spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))
 
@@ -696,11 +688,12 @@ function GameUI.IsLoading()
 end
 
 function GameUI.IsAnyMenu()
-	return isMenu or isFastTravel
+	return isMenu or isLoading or isFastTravel
 end
 
 function GameUI.IsMainMenu()
-	return GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame()
+	return currentMenu == GameUI.Menu.MainMenu
+	--return GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame()
 end
 
 function GameUI.IsScene()
