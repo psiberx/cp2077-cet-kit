@@ -598,19 +598,32 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
-		Observe('gameuiGameSystemUI', 'SwapGameContext', function(_, oldContext, newContext)
-			--spdlog.info(('GameSystemUI::SwapGameContext(%q, %q)'):format(tostring(oldContext), tostring(newContext)))
+		Observe('HUDManager', 'OnQuickHackUIVisibleChanged', function(quickhacking)
+			--spdlog.info(('HUDManager::OnQuickHackUIVisibleChanged(%s)'):format(tostring(quickhacking)))
 
-			-- bugfix: new context is broken
-			if oldContext.value == GameUI.Context.Scanning.value then
-				newContext = GameUI.Context.QuickHack
-			elseif oldContext.value == GameUI.Context.QuickHack.value then
-				newContext = GameUI.Context.Scanning
+			if quickhacking then
+				updateContext(nil, GameUI.Context.QuickHack)
+			else
+				updateContext(GameUI.Context.QuickHack, nil)
 			end
 
-			updateContext(oldContext, newContext)
 			notifyObservers()
 		end)
+
+		--[[ This can cause crashes for some users ]]
+		--Observe('gameuiGameSystemUI', 'SwapGameContext', function(_, oldContext, newContext)
+		--	--spdlog.info(('GameSystemUI::SwapGameContext(%q, %q)'):format(tostring(oldContext), tostring(newContext)))
+		--
+		--	-- bugfix: new context is broken
+		--	if oldContext.value == GameUI.Context.Scanning.value then
+		--		newContext = GameUI.Context.QuickHack
+		--	elseif oldContext.value == GameUI.Context.QuickHack.value then
+		--		newContext = GameUI.Context.Scanning
+		--	end
+		--
+		--	updateContext(oldContext, newContext)
+		--	notifyObservers()
+		--end)
 
 		Observe('gameuiGameSystemUI', 'ResetGameContext', function()
 			--spdlog.info(('GameSystemUI::ResetGameContext()'))
