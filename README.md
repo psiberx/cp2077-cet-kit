@@ -97,7 +97,7 @@ registerForEvent('onInit', function()
 end)
 ```
 
-### Track Loading State
+### Track Game Session
 
 ```lua
 local GameUI = require('GameUI')
