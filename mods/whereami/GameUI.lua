@@ -15,20 +15,49 @@ end)
 See `GameUI.PrintState()` for all state properties
 ]]
 
-local GameUI = { version = '0.8.1' }
+local GameUI = { version = '0.9.1' }
 
 GameUI.Event = {
-	Observe = 'Observe',
-	Load = 'Load',
-	Loaded = 'Loaded',
-	FastTravel = 'FastTravel',
-	FastTraveled = 'FastTraveled',
 	Braindance = 'Braindance',
-	Vehicle = 'Vehicle',
-	Photo = 'Photo',
-	Menu = 'Menu',
 	Camera = 'Camera',
 	Context = 'Context',
+	FastTravel = 'FastTravel',
+	FastTraveled = 'FastTraveled',
+	Loaded = 'Loaded',
+	Loading = 'Loading',
+	Menu = 'Menu',
+	Photo = 'Photo',
+	Unloaded = 'Unloaded',
+	Update = 'Update',
+	Vehicle = 'Vehicle',
+}
+
+GameUI.Menu = {
+	Attributes = 'Attributes',
+	BodyType = 'BodyType',
+	Brightness = 'Brightness',
+	Controller = 'Controller',
+	Credits = 'Credits',
+	Customization = 'Customization',
+	DeathMenu = 'DeathMenu',
+	Difficulty = 'Difficulty',
+	FastTravel = 'FastTravel',
+	HDR = 'HDR',
+	Hub = 'Hub',
+	LifePath = 'LifePath',
+	LoadGame = 'LoadGame',
+	MainMenu = 'MainMenu',
+	Map = 'Map',
+	NetworkBreach = 'NetworkBreach',
+	NewGame = 'NewGame',
+	PauseMenu = 'PauseMenu',
+	RipperDoc = 'RipperDoc',
+	SaveGame = 'SaveGame',
+	Settings = 'Settings',
+	Stash = 'Stash',
+	Summary = 'Summary',
+	Trade = 'Trade',
+	Vendor = 'Vendor',
 }
 
 GameUI.Camera = {
@@ -37,12 +66,12 @@ GameUI.Camera = {
 }
 
 local initialized = {}
-local observers = {}
 local listeners = {}
 local previousState = { menu = false }
 
-local isLoading = false
+local isDetached = true
 local isLoaded = false
+local isLoading = false
 local isMenu = true
 local isVehicle = false
 local isBraindance = false
@@ -55,8 +84,9 @@ local currentCamera = GameUI.Camera.FirstPerson
 local contextStack = {}
 
 local stateProps = {
-	{ current = 'isLoading', previous = nil, event = { on = GameUI.Event.Load } },
 	{ current = 'isLoaded', previous = nil, event = { on = GameUI.Event.Loaded } },
+	{ current = 'isDetached', previous = nil, event = { on = GameUI.Event.Unloaded } },
+	{ current = 'isLoading', previous = 'wasLoading', event = { change = GameUI.Event.Loading } },
 	{ current = 'isMenu', previous = 'wasMenu' },
 	{ current = 'isScene', previous = 'wasScene' },
 	{ current = 'isVehicle', previous = 'wasVehicle', event = { change = GameUI.Event.Vehicle } },
@@ -74,47 +104,48 @@ local stateProps = {
 }
 
 local eventListens = {
-	[GameUI.Event.Observe] = { loading = true, menu = true, vehicle = true, braindance = true, sceneTier = true, photoMode = true, fastTravel = true, context = true },
-	[GameUI.Event.Load] = { loading = true },
-	[GameUI.Event.Loaded] = { loading = true },
+	[GameUI.Event.Braindance] = { braindance = true },
+	[GameUI.Event.Camera] = { vehicle = true },
+	[GameUI.Event.Context] = { context = true },
 	[GameUI.Event.FastTravel] = { fastTravel = true },
 	[GameUI.Event.FastTraveled] = { fastTravel = true },
+	[GameUI.Event.Loaded] = { loaded = true },
+	[GameUI.Event.Loading] = { loading = true },
 	[GameUI.Event.Menu] = { menu = true },
-	[GameUI.Event.Vehicle] = { vehicle = true },
-	[GameUI.Event.Camera] = { vehicle = true },
-	[GameUI.Event.Braindance] = { braindance = true },
 	[GameUI.Event.Photo] = { photoMode = true },
-	[GameUI.Event.Context] = { context = true },
+	[GameUI.Event.Unloaded] = { loaded = true },
+	[GameUI.Event.Update] = { loaded = true, loading = true, menu = true, vehicle = true, braindance = true, sceneTier = true, photoMode = true, fastTravel = true, context = true },
+	[GameUI.Event.Vehicle] = { vehicle = true },
 }
 
 local menuScenarios = {
-	['MenuScenario_BodyTypeSelection'] = { menu = 'NewGame', submenu = 'BodyType' },
+	['MenuScenario_BodyTypeSelection'] = { menu = GameUI.Menu.NewGame, submenu = GameUI.Menu.BodyType },
 	['MenuScenario_BoothMode'] = { menu = 'BoothMode', submenu = false },
-	['MenuScenario_CharacterCustomization'] = { menu = 'NewGame', submenu = 'Customization' },
+	['MenuScenario_CharacterCustomization'] = { menu = GameUI.Menu.NewGame, submenu = GameUI.Menu.Customization },
 	['MenuScenario_ClippedMenu'] = { menu = 'ClippedMenu', submenu = false },
-	['MenuScenario_Credits'] = { menu = 'Credits', submenu = false },
-	['MenuScenario_DeathMenu'] = { menu = 'DeathMenu', submenu = false },
-	['MenuScenario_Difficulty'] = { menu = 'NewGame', submenu = 'Difficulty' },
+	['MenuScenario_Credits'] = { menu = GameUI.Menu.MainMenu, submenu = GameUI.Menu.Credits },
+	['MenuScenario_DeathMenu'] = { menu = GameUI.Menu.DeathMenu, submenu = false },
+	['MenuScenario_Difficulty'] = { menu = GameUI.Menu.NewGame, submenu = GameUI.Menu.Difficulty },
 	['MenuScenario_E3EndMenu'] = { menu = 'E3EndMenu', submenu = false },
-	['MenuScenario_FastTravel'] = { menu = 'FastTravel', submenu = 'Map' },
+	['MenuScenario_FastTravel'] = { menu = GameUI.Menu.FastTravel, submenu = GameUI.Menu.Map },
 	['MenuScenario_FinalBoards'] = { menu = 'FinalBoards', submenu = false },
 	['MenuScenario_FindServers'] = { menu = 'FindServers', submenu = false },
-	['MenuScenario_HubMenu'] = { menu = 'Hub', submenu = false },
+	['MenuScenario_HubMenu'] = { menu = GameUI.Menu.Hub, submenu = false },
 	['MenuScenario_Idle'] = { menu = false, submenu = false },
-	['MenuScenario_LifePathSelection'] = { menu = 'NewGame', submenu = 'LifePath' },
-	['MenuScenario_LoadGame'] = { menu = 'MainMenu', submenu = 'LoadGame' },
+	['MenuScenario_LifePathSelection'] = { menu = GameUI.Menu.NewGame, submenu = GameUI.Menu.LifePath },
+	['MenuScenario_LoadGame'] = { menu = GameUI.Menu.MainMenu, submenu = GameUI.Menu.LoadGame },
 	['MenuScenario_MultiplayerMenu'] = { menu = 'Multiplayer', submenu = false },
 	['MenuScenario_NetworkBreach'] = { menu = 'NetworkBreach', submenu = false },
-	['MenuScenario_NewGame'] = { menu = 'NewGame', submenu = false },
-	['MenuScenario_PauseMenu'] = { menu = 'PauseMenu', submenu = false },
+	['MenuScenario_NewGame'] = { menu = GameUI.Menu.NewGame, submenu = false },
+	['MenuScenario_PauseMenu'] = { menu = GameUI.Menu.PauseMenu, submenu = false },
 	['MenuScenario_PlayRecordedSession'] = { menu = 'PlayRecordedSession', submenu = false },
 	['MenuScenario_PreGameSubMenu'] = { menu = 'PreGameSubMenu', submenu = false },
-	['MenuScenario_Settings'] = { menu = 'MainMenu', submenu = 'Settings' },
-	['MenuScenario_SingleplayerMenu'] = { menu = 'MainMenu', submenu = false },
-	['MenuScenario_StatsAdjustment'] = { menu = 'NewGame', submenu = 'Attributes' },
-	['MenuScenario_Storage'] = { menu = 'Stash', submenu = false },
-	['MenuScenario_Summary'] = { menu = 'NewGame', submenu = 'Summary' },
-	['MenuScenario_Vendor'] = { menu = 'Vendor', submenu = false },
+	['MenuScenario_Settings'] = { menu = GameUI.Menu.MainMenu, submenu = GameUI.Menu.Settings },
+	['MenuScenario_SingleplayerMenu'] = { menu = GameUI.Menu.MainMenu, submenu = false },
+	['MenuScenario_StatsAdjustment'] = { menu = GameUI.Menu.NewGame, submenu = GameUI.Menu.Attributes },
+	['MenuScenario_Storage'] = { menu = GameUI.Menu.Stash, submenu = false },
+	['MenuScenario_Summary'] = { menu = GameUI.Menu.NewGame, submenu = GameUI.Menu.Summary },
+	['MenuScenario_Vendor'] = { menu = GameUI.Menu.Vendor, submenu = false },
 }
 
 local function toStudlyCase(s)
@@ -123,14 +154,18 @@ local function toStudlyCase(s)
 	end))
 end
 
-local function updateLoading(loading)
-	isLoading = loading
+local function updateDetached(detached)
+	isDetached = detached
 	isLoaded = false
 end
 
 local function updateLoaded(loaded)
-	isLoading = not loaded
+	isDetached = not loaded
 	isLoaded = loaded
+end
+
+local function updateLoading(loading)
+	isLoading = loading
 end
 
 local function updateMenu(menuActive)
@@ -140,7 +175,7 @@ end
 local function updateMenuScenario(scenarioName)
 	local scenario = menuScenarios[scenarioName] or menuScenarios['MenuScenario_Idle']
 
-	isMenu = scenario.menu ~= nil
+	isMenu = scenario.menu ~= false
 	currentMenu = scenario.menu
 	currentSubmenu = scenario.submenu
 end
@@ -206,6 +241,14 @@ local function refreshCurrentState()
 	updateBraindance(blackboardBD:GetBool(blackboardDefs.Braindance.IsActive))
 	updatePhotoMode(blackboardPM:GetBool(blackboardDefs.PhotoMode.IsActive))
 	updateSceneTier(blackboardPSM:GetInt(blackboardDefs.PlayerStateMachine.SceneTier))
+
+	if not isLoaded then
+		updateDetached(GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame())
+
+		if isDetached then
+			currentMenu = GameUI.Menu.MainMenu
+		end
+	end
 end
 
 local function notifyObservers()
@@ -223,15 +266,9 @@ local function notifyObservers()
 	end
 
 	if stateChanged then
-		for _, callback in ipairs(observers) do
-			callback(currentState)
-		end
-
-		if currentState.event then
-			for _, listener in ipairs(listeners) do
-				if listener.event == currentState.event then
-					listener.callback(currentState)
-				end
+		for _, listener in ipairs(listeners) do
+			if listener.event == GameUI.Event.Update or listener.event == currentState.event then
+				listener.callback(currentState)
 			end
 		end
 
@@ -241,6 +278,10 @@ local function notifyObservers()
 
 		previousState = currentState
 	end
+end
+
+local function pushCurrentState()
+	previousState = GameUI.GetState()
 end
 
 local function initialize(event)
@@ -265,27 +306,32 @@ local function initialize(event)
 		initialized.data = true
 	end
 
-	local listen = eventListens[event] or eventListens[GameUI.Event.Observe]
+	local listen = eventListens[event] or eventListens[GameUI.Event.Update]
 
-	-- Loading State Listeners
+	-- Loaded State Listeners
 
-	if listen.loading and not initialized.loading then
+	if listen.loaded and not initialized.loaded then
 		Observe('PlayerPuppet', 'OnDetach', function()
 			--spdlog.info(('PlayerPuppet::OnDetach()'))
 
 			if isMenu then
-				updateLoading(true)
+				updateDetached(true)
 				updateBraindance(false)
 				updatePhotoMode(false)
 				updateContext()
-				notifyObservers()
+
+				if currentMenu ~= GameUI.Menu.MainMenu then
+					notifyObservers()
+				else
+					pushCurrentState()
+				end
 			end
 		end)
 
 		Observe('RadialWheelController', 'OnIsInMenuChanged', function(menuActive)
 			--spdlog.info(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(menuActive)))
 
-			if isLoading then
+			if isDetached then
 				if not menuActive then
 					updateLoaded(true)
 					updateMenuScenario()
@@ -294,6 +340,28 @@ local function initialize(event)
 				end
 			else
 				updateMenu(menuActive)
+			end
+		end)
+
+		initialized.loaded = true
+	end
+
+	-- Loading State Listeners
+
+	if listen.loading and not initialized.loading then
+		Observe('LoadingScreenProgressBarController', 'OnInitialize', function()
+			--spdlog.info(('LoadingScreenProgressBarController::OnInitialize()'))
+
+			updateLoading(true)
+			notifyObservers()
+		end)
+
+		Observe('LoadingScreenProgressBarController', 'SetProgress', function(_, progress)
+			--spdlog.info(('LoadingScreenProgressBarController::SetProgress(%.3f)'):format(progress))
+
+			if progress == 1.0 then
+				updateLoading(false)
+				notifyObservers()
 			end
 		end)
 
@@ -330,37 +398,29 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
-		--Observe('DropPointControllerPS', 'OnOpenVendorUI', function()
-		--	--spdlog.info(('DropPointControllerPS::OnOpenVendorUI()'))
-		--
-		--	updateMenuScenario('MenuScenario_Vendor')
-		--	updateMenuItem('DropPoint')
-		--	notifyObservers()
-		--end)
-
 		local menuItemListeners = {
 			['MenuScenario_SingleplayerMenu'] = {
-				['OnLoadGame'] = 'LoadGame',
+				['OnLoadGame'] = GameUI.Menu.LoadGame,
 			},
 			['MenuScenario_PauseMenu'] = {
-				['OnSwitchToBrightnessSettings'] = 'Brightness',
-				['OnSwitchToControllerPanel'] = 'Controller',
-				['OnSwitchToCredits'] = 'Credits',
-				['OnSwitchToHDRSettings'] = 'HDR',
-				['OnSwitchToLoadGame'] = 'LoadGame',
-				['OnSwitchToSaveGame'] = 'SaveGame',
-				['OnSwitchToSettings'] = 'Settings',
+				['OnSwitchToBrightnessSettings'] = GameUI.Menu.Brightness,
+				['OnSwitchToControllerPanel'] = GameUI.Menu.Controller,
+				['OnSwitchToCredits'] = GameUI.Menu.Credits,
+				['OnSwitchToHDRSettings'] = GameUI.Menu.HDR,
+				['OnSwitchToLoadGame'] = GameUI.Menu.LoadGame,
+				['OnSwitchToSaveGame'] = GameUI.Menu.SaveGame,
+				['OnSwitchToSettings'] = GameUI.Menu.Settings,
 			},
 			['MenuScenario_DeathMenu'] = {
-				['OnSwitchToBrightnessSettings'] = 'Brightness',
-				['OnSwitchToControllerPanel'] = 'Controller',
-				['OnSwitchToHDRSettings'] = 'HDR',
-				['OnSwitchToLoadGame'] = 'LoadGame',
-				['OnSwitchToSettings'] = 'Settings',
+				['OnSwitchToBrightnessSettings'] = GameUI.Menu.Brightness,
+				['OnSwitchToControllerPanel'] = GameUI.Menu.Controller,
+				['OnSwitchToHDRSettings'] = GameUI.Menu.HDR,
+				['OnSwitchToLoadGame'] = GameUI.Menu.LoadGame,
+				['OnSwitchToSettings'] = GameUI.Menu.Settings,
 			},
 			['MenuScenario_Vendor'] = {
-				['OnSwitchToVendor'] = 'Trade',
-				['OnSwitchToRipperDoc'] = 'RipperDoc',
+				['OnSwitchToVendor'] = GameUI.Menu.Trade,
+				['OnSwitchToRipperDoc'] = GameUI.Menu.RipperDoc,
 				['OnSwitchToCrafting'] = 'Crafting',
 			},
 		}
@@ -387,7 +447,7 @@ local function initialize(event)
 				--spdlog.info(('%s::%s()'):format(menuScenario, menuBackEvent))
 
 				if Game.NameToString(self.prevMenuName) == 'settings_main' then
-					updateMenuItem('Settings')
+					updateMenuItem(GameUI.Menu.Settings)
 				else
 					updateMenuItem(false)
 				end
@@ -396,10 +456,18 @@ local function initialize(event)
 			end)
 		end
 
+		--Observe('DropPointControllerPS', 'OnOpenVendorUI', function()
+		--	--spdlog.info(('DropPointControllerPS::OnOpenVendorUI()'))
+		--
+		--	updateMenuScenario('MenuScenario_Vendor')
+		--	updateMenuItem('DropPoint')
+		--	notifyObservers()
+		--end)
+
 		Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
 			--spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))
 
-			updateLoading(false)
+			--updateDetached(false)
 			updateMenuScenario('MenuScenario_SingleplayerMenu')
 			updateBraindance(false)
 			updatePhotoMode(false)
@@ -443,7 +511,7 @@ local function initialize(event)
 		initialized.braindance = true
 	end
 
-	-- Scene Tier Listeners
+	-- Scene State Listeners
 
 	if listen.sceneTier and not initialized.sceneTier then
 		Observe('CrosshairGameController_NoWeapon', 'OnPSMSceneTierChanged', function(sceneTierValue)
@@ -573,7 +641,7 @@ end
 
 function GameUI.Observe(callback)
 	if type(callback) == 'function' then
-		table.insert(observers, callback)
+		table.insert(listeners, { event = GameUI.Event.Update, callback = callback })
 	end
 
 	initialize()
@@ -587,19 +655,19 @@ function GameUI.Listen(event, callback)
 	end
 end
 
-function GameUI.OnLoad(callback)
-	if type(callback) == 'function' then
-		table.insert(listeners, { event = GameUI.Event.Load, callback = callback })
-
-		initialize(GameUI.Event.Load)
-	end
-end
-
 function GameUI.OnLoaded(callback)
 	if type(callback) == 'function' then
 		table.insert(listeners, { event = GameUI.Event.Loaded, callback = callback })
 
 		initialize(GameUI.Event.Loaded)
+	end
+end
+
+function GameUI.OnUnloaded(callback)
+	if type(callback) == 'function' then
+		table.insert(listeners, { event = GameUI.Event.Unloaded, callback = callback })
+
+		initialize(GameUI.Event.Unloaded)
 	end
 end
 
@@ -619,20 +687,20 @@ function GameUI.OnFastTraveled(callback)
 	end
 end
 
+function GameUI.IsDetached()
+	return isDetached
+end
+
 function GameUI.IsLoading()
 	return isLoading
 end
 
-function GameUI.IsLoaded()
-	return isLoaded
+function GameUI.IsAnyMenu()
+	return isMenu or isFastTravel
 end
 
 function GameUI.IsMainMenu()
 	return GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame()
-end
-
-function GameUI.IsAnyMenu()
-	return isMenu or isFastTravel
 end
 
 function GameUI.IsScene()
@@ -692,8 +760,9 @@ end
 function GameUI.GetState()
 	local currentState = {}
 
+	currentState.isDetached = GameUI.IsDetached()
 	currentState.isLoading = GameUI.IsLoading()
-	currentState.isLoaded = GameUI.IsLoaded()
+	currentState.isLoaded = isLoaded
 
 	currentState.isMenu = GameUI.IsAnyMenu()
 	currentState.isScene = GameUI.IsScene()
@@ -795,10 +864,14 @@ function GameUI.PrintState(state, expanded, all)
 		print('- Event:', state.event)
 	end
 
-	if state.isLoading then
-		print('- Loading:', state.isLoading)
+	if state.isDetached then
+		print('- Detached:', state.isDetached)
 	elseif state.isLoaded then
 		print('- Loaded:', state.isLoaded)
+	end
+
+	if state.isLoading then
+		print('- Loading:', state.isLoading)
 	end
 
 	if state.isMenu or all then
