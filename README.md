@@ -18,8 +18,15 @@ Track Game UI state reactively. Doesn't use recurrent `onUpdate` checks.
  
 Current detections:
  
-- Menus (Main Menu, Pause Menu, Hub, Fast Travel, Drop Point, Vendor, Stash)
-- Loading / Loaded State (New Game and Load Game)
+- Load State (New Game, Load Game)
+- Menus
+  * Main Menu (Load Game, Settings, Credits)
+  * New Game (Difficulty, Life Path, Body Type, Customization, Attributes, Summary)
+  * Pause Menu (Save Game, Load Game, Settings, Credits) 
+  * Hub (Inventory, Backpack, Cyberware, Character, Stats, Crafting, Journal, Messages, Shards, Tarot, Database)
+  * Vendor (Trade, RipperDoc, Drop Point)
+  * Fast Travel
+  * Stash
 - Special Scenes (Cutscenes, Dialogs, Mirrors)
 - Scanning with Kiroshi Optics
 - Quickhacking with Cyberdeck
@@ -34,7 +41,6 @@ Todo:
 - Vehicle FPP and TPP
 - Johnny's memories and takeovers 
 - Visibility of individual HUD elements 
-- Identify each menu screen
 
 You can display own HUD elements and apply contextual logic depending on the current UI.
 
