@@ -104,16 +104,14 @@ local GameUI = require('GameUI')
 
 registerForEvent('onInit', function()
     GameUI.OnLoaded(function()
-        -- Triggered once the load is complete 
-        -- and the player is in the game 
-        -- (i.e. after the loading screen)
+        -- Triggered once the load is complete and the player is in the game
+        -- (after the loading screen for "Load Game" or "New Game")
         print('Loaded')
     end)
 
     GameUI.OnUnloaded(function()
-        -- Triggered once the load is started
-        -- and the current game session ended
-        -- (including when the player selects "Exit to Main Menu")
+        -- Triggered once the current game session has ended
+        -- (when "Load Game" or "Exit to Main Menu" selected)
         print('Unloaded')
     end)
 end)
