@@ -17,6 +17,13 @@ See `GameUI.PrintState()` for all state properties
 
 local GameUI = { version = '0.8.1' }
 
+GameUI.Event = {
+	Load = 'Load',
+	Loaded = 'Loaded',
+	FastTravel = 'FastTravel',
+	FastTraveled = 'FastTraveled',
+}
+
 local initialized = {}
 local observers = {}
 local listeners = {}
@@ -34,12 +41,12 @@ local currentSubmenu
 local contextStack = {}
 
 local stateProps = {
-	{ current = 'isLoading', previous = nil, event = 'Load' },
-	{ current = 'isLoaded', previous = nil, event = 'Loaded' },
+	{ current = 'isLoading', previous = nil, event = GameUI.Event.Load },
+	{ current = 'isLoaded', previous = nil, event = GameUI.Event.Loaded },
 	{ current = 'isMenu', previous = 'wasMenu' },
 	{ current = 'isScene', previous = 'wasScene' },
 	{ current = 'isBraindance', previous = 'wasBraindance' },
-	{ current = 'isFastTravel', previous = 'wasFastTravel', event = { start = 'FastTravel', finish = 'FastTraveled' } },
+	{ current = 'isFastTravel', previous = 'wasFastTravel', event = { start = GameUI.Event.FastTravel, finish = GameUI.Event.FastTraveled } },
 	{ current = 'isDefault', previous = 'wasDefault' },
 	{ current = 'isScanner', previous = 'wasScanner' },
 	{ current = 'isPopup', previous = 'wasPopup' },
@@ -181,6 +188,14 @@ local function notifyObservers()
 	if stateChanged then
 		for _, callback in ipairs(observers) do
 			callback(currentState)
+		end
+
+		if currentState.event then
+			for _, listener in ipairs(listeners) do
+				if listener.event == currentState.event then
+					listener.callback(currentState)
+				end
+			end
 		end
 
 		if isLoaded then
@@ -518,7 +533,7 @@ end
 
 function GameUI.OnLoad(callback)
 	if type(callback) == 'function' then
-		table.insert(listeners, { event = 'Load', callback = callback })
+		table.insert(listeners, { event = GameUI.Event.Load, callback = callback })
 
 		initialize({ loading = true })
 	end
@@ -526,7 +541,7 @@ end
 
 function GameUI.OnLoaded(callback)
 	if type(callback) == 'function' then
-		table.insert(listeners, { event = 'Loaded', callback = callback })
+		table.insert(listeners, { event = GameUI.Event.Loaded, callback = callback })
 
 		initialize({ loading = true })
 	end
@@ -534,7 +549,7 @@ end
 
 function GameUI.OnFastTravel(callback)
 	if type(callback) == 'function' then
-		table.insert(listeners, { event = 'FastTravel', callback = callback })
+		table.insert(listeners, { event = GameUI.Event.FastTravel, callback = callback })
 
 		initialize({ fastTravel = true })
 	end
@@ -542,7 +557,7 @@ end
 
 function GameUI.OnFastTraveled(callback)
 	if type(callback) == 'function' then
-		table.insert(listeners, { event = 'FastTraveled', callback = callback })
+		table.insert(listeners, { event = GameUI.Event.FastTraveled, callback = callback })
 
 		initialize({ fastTravel = true })
 	end
