@@ -39,7 +39,7 @@ GameUI.Camera = {
 local initialized = {}
 local observers = {}
 local listeners = {}
-local previousState = { _ = false }
+local previousState = { menu = false }
 
 local isLoading = false
 local isLoaded = false
@@ -49,9 +49,9 @@ local isBraindance = false
 local isFastTravel = false
 local isPhotoMode = false
 local sceneTier = 4
-local currentMenu
-local currentSubmenu
-local currentCamera
+local currentMenu = false
+local currentSubmenu = false
+local currentCamera = GameUI.Camera.FirstPerson
 local contextStack = {}
 
 local stateProps = {
@@ -68,9 +68,9 @@ local stateProps = {
 	{ current = 'isDevice', previous = 'wasDevice' },
 	{ current = 'isPhoto', previous = 'wasPhoto', event = { change = GameUI.Event.Photo } },
 	{ current = 'camera', previous = 'lastCamera', event = { change = GameUI.Event.Camera }, parent = 'isVehicle' },
-	{ current = 'context', previous = 'lastContext', event = { change = GameUI.Event.Context } },
 	{ current = 'menu', previous = 'lastMenu', event = { change = GameUI.Event.Menu } },
 	{ current = 'submenu', previous = 'lastSubmenu', event = { change = GameUI.Event.Menu } },
+	{ current = 'context', previous = 'lastContext', event = { change = GameUI.Event.Context } },
 }
 
 local eventListens = {
@@ -89,32 +89,32 @@ local eventListens = {
 
 local menuScenarios = {
 	['MenuScenario_BodyTypeSelection'] = { menu = 'NewGame', submenu = 'BodyType' },
-	['MenuScenario_BoothMode'] = { menu = 'BoothMode', submenu = nil },
+	['MenuScenario_BoothMode'] = { menu = 'BoothMode', submenu = false },
 	['MenuScenario_CharacterCustomization'] = { menu = 'NewGame', submenu = 'Customization' },
-	['MenuScenario_ClippedMenu'] = { menu = 'ClippedMenu', submenu = nil },
-	['MenuScenario_Credits'] = { menu = 'Credits', submenu = nil },
-	['MenuScenario_DeathMenu'] = { menu = 'DeathMenu', submenu = nil },
+	['MenuScenario_ClippedMenu'] = { menu = 'ClippedMenu', submenu = false },
+	['MenuScenario_Credits'] = { menu = 'Credits', submenu = false },
+	['MenuScenario_DeathMenu'] = { menu = 'DeathMenu', submenu = false },
 	['MenuScenario_Difficulty'] = { menu = 'NewGame', submenu = 'Difficulty' },
-	['MenuScenario_E3EndMenu'] = { menu = 'E3EndMenu', submenu = nil },
+	['MenuScenario_E3EndMenu'] = { menu = 'E3EndMenu', submenu = false },
 	['MenuScenario_FastTravel'] = { menu = 'FastTravel', submenu = 'Map' },
-	['MenuScenario_FinalBoards'] = { menu = 'FinalBoards', submenu = nil },
-	['MenuScenario_FindServers'] = { menu = 'FindServers', submenu = nil },
-	['MenuScenario_HubMenu'] = { menu = 'Hub', submenu = nil },
-	['MenuScenario_Idle'] = { menu = nil, submenu = nil },
+	['MenuScenario_FinalBoards'] = { menu = 'FinalBoards', submenu = false },
+	['MenuScenario_FindServers'] = { menu = 'FindServers', submenu = false },
+	['MenuScenario_HubMenu'] = { menu = 'Hub', submenu = false },
+	['MenuScenario_Idle'] = { menu = false, submenu = false },
 	['MenuScenario_LifePathSelection'] = { menu = 'NewGame', submenu = 'LifePath' },
 	['MenuScenario_LoadGame'] = { menu = 'MainMenu', submenu = 'LoadGame' },
-	['MenuScenario_MultiplayerMenu'] = { menu = 'Multiplayer', submenu = nil },
-	['MenuScenario_NetworkBreach'] = { menu = 'NetworkBreach', submenu = nil },
-	['MenuScenario_NewGame'] = { menu = 'NewGame', submenu = nil },
-	['MenuScenario_PauseMenu'] = { menu = 'PauseMenu', submenu = nil },
-	['MenuScenario_PlayRecordedSession'] = { menu = 'PlayRecordedSession', submenu = nil },
-	['MenuScenario_PreGameSubMenu'] = { menu = 'PreGameSubMenu', submenu = nil },
+	['MenuScenario_MultiplayerMenu'] = { menu = 'Multiplayer', submenu = false },
+	['MenuScenario_NetworkBreach'] = { menu = 'NetworkBreach', submenu = false },
+	['MenuScenario_NewGame'] = { menu = 'NewGame', submenu = false },
+	['MenuScenario_PauseMenu'] = { menu = 'PauseMenu', submenu = false },
+	['MenuScenario_PlayRecordedSession'] = { menu = 'PlayRecordedSession', submenu = false },
+	['MenuScenario_PreGameSubMenu'] = { menu = 'PreGameSubMenu', submenu = false },
 	['MenuScenario_Settings'] = { menu = 'MainMenu', submenu = 'Settings' },
-	['MenuScenario_SingleplayerMenu'] = { menu = 'MainMenu', submenu = nil },
+	['MenuScenario_SingleplayerMenu'] = { menu = 'MainMenu', submenu = false },
 	['MenuScenario_StatsAdjustment'] = { menu = 'NewGame', submenu = 'Attributes' },
-	['MenuScenario_Storage'] = { menu = 'Stash', submenu = nil },
+	['MenuScenario_Storage'] = { menu = 'Stash', submenu = false },
 	['MenuScenario_Summary'] = { menu = 'NewGame', submenu = 'Summary' },
-	['MenuScenario_Vendor'] = { menu = 'Vendor', submenu = nil },
+	['MenuScenario_Vendor'] = { menu = 'Vendor', submenu = false },
 }
 
 local function toStudlyCase(s)
@@ -727,8 +727,10 @@ function GameUI.GetState()
 				currentState.event = stateProp.event.on
 			elseif stateProp.event.off and not currentValue and previousValue then
 				currentState.event = stateProp.event.off
-			elseif stateProp.event.change and tostring(currentValue) ~= tostring(previousValue) then
-				currentState.event = stateProp.event.change
+			elseif stateProp.event.change then
+				if previousValue ~= nil and tostring(currentValue) ~= tostring(previousValue) then
+					currentState.event = stateProp.event.change
+				end
 			end
 		end
 	end
