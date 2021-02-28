@@ -18,10 +18,22 @@ See `GameUI.PrintState()` for all state properties
 local GameUI = { version = '0.8.1' }
 
 GameUI.Event = {
+	Observe = 'Observe',
 	Load = 'Load',
 	Loaded = 'Loaded',
 	FastTravel = 'FastTravel',
 	FastTraveled = 'FastTraveled',
+	Braindance = 'Braindance',
+	Vehicle = 'Vehicle',
+	Photo = 'Photo',
+	Menu = 'Menu',
+	Camera = 'Camera',
+	Context = 'Context',
+}
+
+GameUI.Camera = {
+	FirstPerson = 'FirstPerson',
+	ThirdPerson = 'ThirdPerson',
 }
 
 local initialized = {}
@@ -32,29 +44,47 @@ local previousState = { _ = false }
 local isLoading = false
 local isLoaded = false
 local isMenu = true
+local isVehicle = false
 local isBraindance = false
 local isFastTravel = false
 local isPhotoMode = false
 local sceneTier = 4
 local currentMenu
 local currentSubmenu
+local currentCamera
 local contextStack = {}
 
 local stateProps = {
-	{ current = 'isLoading', previous = nil, event = GameUI.Event.Load },
-	{ current = 'isLoaded', previous = nil, event = GameUI.Event.Loaded },
+	{ current = 'isLoading', previous = nil, event = { on = GameUI.Event.Load } },
+	{ current = 'isLoaded', previous = nil, event = { on = GameUI.Event.Loaded } },
 	{ current = 'isMenu', previous = 'wasMenu' },
 	{ current = 'isScene', previous = 'wasScene' },
-	{ current = 'isBraindance', previous = 'wasBraindance' },
-	{ current = 'isFastTravel', previous = 'wasFastTravel', event = { start = GameUI.Event.FastTravel, finish = GameUI.Event.FastTraveled } },
+	{ current = 'isVehicle', previous = 'wasVehicle', event = { change = GameUI.Event.Vehicle } },
+	{ current = 'isBraindance', previous = 'wasBraindance', event = { change = GameUI.Event.Braindance } },
+	{ current = 'isFastTravel', previous = 'wasFastTravel', event = { on = GameUI.Event.FastTravel, off = GameUI.Event.FastTraveled } },
 	{ current = 'isDefault', previous = 'wasDefault' },
 	{ current = 'isScanner', previous = 'wasScanner' },
 	{ current = 'isPopup', previous = 'wasPopup' },
 	{ current = 'isDevice', previous = 'wasDevice' },
-	{ current = 'isPhoto', previous = 'wasPhoto' },
-	{ current = 'menu', previous = 'lastMenu' },
-	{ current = 'submenu', previous = 'lastSubmenu' },
-	{ current = 'context', previous = 'lastContext' },
+	{ current = 'isPhoto', previous = 'wasPhoto', event = { change = GameUI.Event.Photo } },
+	{ current = 'menu', previous = 'lastMenu', event = { change = GameUI.Event.Menu } },
+	{ current = 'submenu', previous = 'lastSubmenu', event = { change = GameUI.Event.Menu } },
+	{ current = 'camera', previous = 'lastCamera', event = { change = GameUI.Event.Camera }, parent = 'isVehicle' },
+	{ current = 'context', previous = 'lastContext', event = { change = GameUI.Event.Context } },
+}
+
+local eventListens = {
+	[GameUI.Event.Observe] = { loading = true, menu = true, vehicle = true, braindance = true, sceneTier = true, photoMode = true, fastTravel = true, context = true },
+	[GameUI.Event.Load] = { loading = true },
+	[GameUI.Event.Loaded] = { loading = true },
+	[GameUI.Event.FastTravel] = { fastTravel = true },
+	[GameUI.Event.FastTraveled] = { fastTravel = true },
+	[GameUI.Event.Menu] = { menu = true },
+	[GameUI.Event.Vehicle] = { vehicle = true },
+	[GameUI.Event.Camera] = { vehicle = true },
+	[GameUI.Event.Braindance] = { braindance = true },
+	[GameUI.Event.Photo] = { photoMode = true },
+	[GameUI.Event.Context] = { context = true },
 }
 
 local menuScenarios = {
@@ -119,6 +149,11 @@ local function updateMenuItem(itemName)
 	currentSubmenu = itemName or nil
 end
 
+local function updateVehicle(vehicleActive, cameraMode)
+	isVehicle = vehicleActive
+	currentCamera = cameraMode and GameUI.Camera.ThirdPerson or GameUI.Camera.FirstPerson
+end
+
 local function updateBraindance(braindanceActive)
 	isBraindance = braindanceActive
 end
@@ -161,11 +196,13 @@ local function refreshCurrentState()
 	local playerId = Game.GetPlayer():GetEntityID()
 	local blackboardDefs = Game.GetAllBlackboardDefs()
 	local blackboardUI = Game.GetBlackboardSystem():Get(blackboardDefs.UI_System)
+	local blackboardVH = Game.GetBlackboardSystem():Get(blackboardDefs.UI_ActiveVehicleData)
 	local blackboardBD = Game.GetBlackboardSystem():Get(blackboardDefs.Braindance)
 	local blackboardPM = Game.GetBlackboardSystem():Get(blackboardDefs.PhotoMode)
 	local blackboardPSM = Game.GetBlackboardSystem():GetLocalInstanced(playerId, blackboardDefs.PlayerStateMachine)
 
 	updateMenu(blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu))
+	updateVehicle(blackboardVH:GetBool(blackboardDefs.UI_ActiveVehicleData.IsPlayerMounted, blackboardDefs.UI_ActiveVehicleData.IsTPPCameraOn))
 	updateBraindance(blackboardBD:GetBool(blackboardDefs.Braindance.IsActive))
 	updatePhotoMode(blackboardPM:GetBool(blackboardDefs.PhotoMode.IsActive))
 	updateSceneTier(blackboardPSM:GetInt(blackboardDefs.PlayerStateMachine.SceneTier))
@@ -206,7 +243,7 @@ local function notifyObservers()
 	end
 end
 
-local function initialize(listen)
+local function initialize(event)
 	if not initialized.data then
 		GameUI.Context = {
 			Default = Enum.new('UIGameContext', 0),
@@ -228,23 +265,13 @@ local function initialize(listen)
 		initialized.data = true
 	end
 
-	if not listen then
-		listen = {
-			loading = true,
-			menu = true,
-			braindance = true,
-			sceneTier = true,
-			photoMode = true,
-			fastTravel = true,
-			context = true,
-		}
-	end
+	local listen = eventListens[event] or eventListens[GameUI.Event.Observe]
 
 	-- Loading State Listeners
 
 	if listen.loading and not initialized.loading then
 		Observe('PlayerPuppet', 'OnDetach', function()
-			spdlog.info(('PlayerPuppet::OnDetach()'))
+			--spdlog.info(('PlayerPuppet::OnDetach()'))
 
 			if isMenu then
 				updateLoading(true)
@@ -256,7 +283,7 @@ local function initialize(listen)
 		end)
 
 		Observe('RadialWheelController', 'OnIsInMenuChanged', function(menuActive)
-			spdlog.info(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(menuActive)))
+			--spdlog.info(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(menuActive)))
 
 			if isLoading then
 				if not menuActive then
@@ -277,7 +304,8 @@ local function initialize(listen)
 
 	if listen.menu and not initialized.menu then
 		Observe('inkMenuScenario', 'SwitchToScenario', function(_, menuName)
-			spdlog.info(('inkMenuScenario::SwitchToScenario(%q)'):format(Game.NameToString(menuName)))
+			--spdlog.info(('inkMenuScenario::SwitchToScenario(%q)'):format(Game.NameToString(menuName)))
+			Game.GetPlayer() -- env fix
 
 			updateMenuScenario(Game.NameToString(menuName))
 			notifyObservers()
@@ -288,21 +316,22 @@ local function initialize(listen)
 		--end)
 
 		Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(menuItemData)
-			spdlog.info(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
+			--spdlog.info(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
+			Game.GetPlayer() -- env fix
 
 			updateMenuItem(toStudlyCase(menuItemData.menuData.label))
 			notifyObservers()
 		end)
 
 		Observe('MenuScenario_HubMenu', 'OnCloseHubMenu', function(_)
-			spdlog.info(('MenuScenario_HubMenu::OnCloseHubMenu()'))
+			--spdlog.info(('MenuScenario_HubMenu::OnCloseHubMenu()'))
 
 			updateMenuItem(false)
 			notifyObservers()
 		end)
 
 		--Observe('DropPointControllerPS', 'OnOpenVendorUI', function()
-		--	spdlog.info(('DropPointControllerPS::OnOpenVendorUI()'))
+		--	--spdlog.info(('DropPointControllerPS::OnOpenVendorUI()'))
 		--
 		--	updateMenuScenario('MenuScenario_Vendor')
 		--	updateMenuItem('DropPoint')
@@ -339,7 +368,7 @@ local function initialize(listen)
 		for menuScenario, menuItemEvents in pairs(menuItemListeners) do
 			for menuEvent, menuItem in pairs(menuItemEvents) do
 				Observe(menuScenario, menuEvent, function()
-					spdlog.info(('%s::%s()'):format(menuScenario, menuEvent))
+					--spdlog.info(('%s::%s()'):format(menuScenario, menuEvent))
 
 					updateMenuScenario(menuScenario)
 					updateMenuItem(menuItem)
@@ -355,7 +384,7 @@ local function initialize(listen)
 
 		for menuScenario, menuBackEvent in pairs(menuBackListeners) do
 			Observe(menuScenario, menuBackEvent, function(self)
-				spdlog.info(('%s::%s()'):format(menuScenario, menuBackEvent))
+				--spdlog.info(('%s::%s()'):format(menuScenario, menuBackEvent))
 
 				if Game.NameToString(self.prevMenuName) == 'settings_main' then
 					updateMenuItem('Settings')
@@ -368,7 +397,7 @@ local function initialize(listen)
 		end
 
 		Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
-			spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))
+			--spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))
 
 			updateLoading(false)
 			updateMenuScenario('MenuScenario_SingleplayerMenu')
@@ -381,11 +410,31 @@ local function initialize(listen)
 		initialized.menu = true
 	end
 
+	-- Vehicle State Listeners
+
+	if listen.vehicle and not initialized.vehicle then
+		Observe('hudCarController', 'OnCameraModeChanged', function(mode)
+			--spdlog.info(('hudCarController::OnCameraModeChanged(%s)'):format(tostring(mode)))
+
+			updateVehicle(true, mode)
+			notifyObservers()
+		end)
+
+		Observe('hudCarController', 'OnUnmountingEvent', function()
+			--spdlog.info(('hudCarController::OnUnmountingEvent()'))
+
+			updateVehicle(false)
+			notifyObservers()
+		end)
+
+		initialized.vehicle = true
+	end
+
 	-- Braindance State Listeners
 
 	if listen.braindance and not initialized.braindance then
 		Observe('BraindanceGameController', 'OnIsActiveUpdated', function(braindanceActive)
-			spdlog.info(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
+			--spdlog.info(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
 
 			updateBraindance(braindanceActive)
 			notifyObservers()
@@ -398,7 +447,7 @@ local function initialize(listen)
 
 	if listen.sceneTier and not initialized.sceneTier then
 		Observe('CrosshairGameController_NoWeapon', 'OnPSMSceneTierChanged', function(sceneTierValue)
-			spdlog.info(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
+			--spdlog.info(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
 
 			updateSceneTier(sceneTierValue)
 			notifyObservers()
@@ -411,14 +460,14 @@ local function initialize(listen)
 
 	if listen.photoMode and not initialized.photoMode then
 		Observe('gameuiPhotoModeMenuController', 'OnShow', function()
-			spdlog.info(('PhotoModeMenuController::OnShow()'))
+			--spdlog.info(('PhotoModeMenuController::OnShow()'))
 
 			updatePhotoMode(true)
 			notifyObservers()
 		end)
 
 		Observe('gameuiPhotoModeMenuController', 'OnHide', function()
-			spdlog.info(('PhotoModeMenuController::OnHide()'))
+			--spdlog.info(('PhotoModeMenuController::OnHide()'))
 
 			updatePhotoMode(false)
 			notifyObservers()
@@ -433,7 +482,7 @@ local function initialize(listen)
 		local fastTravelStart
 
 		Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(request)
-			spdlog.info(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
+			--spdlog.info(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
 
 			if request.isEnabled then
 				fastTravelStart = request.pointRecord
@@ -441,7 +490,7 @@ local function initialize(listen)
 		end)
 
 		Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(request)
-			spdlog.info(('FastTravelSystem::OnPerformFastTravelRequest()'))
+			--spdlog.info(('FastTravelSystem::OnPerformFastTravelRequest()'))
 
 			local fastTravelDestination = request.pointData.pointRecord
 
@@ -452,7 +501,7 @@ local function initialize(listen)
 		end)
 
 		Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(finished)
-			spdlog.info(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
+			--spdlog.info(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
 
 			if isFastTravel and finished then
 				updateFastTravel(false)
@@ -468,7 +517,7 @@ local function initialize(listen)
 
 	if listen.context and not initialized.context then
 		Observe('gameuiGameSystemUI', 'PushGameContext', function(_, newContext)
-			spdlog.info(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
+			--spdlog.info(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
 
 			if isBraindance and newContext.value == GameUI.Context.Scanning.value then
 				return
@@ -479,7 +528,7 @@ local function initialize(listen)
 		end)
 
 		Observe('gameuiGameSystemUI', 'PopGameContext', function(_, oldContext)
-			spdlog.info(('GameSystemUI::PopGameContext(%q)'):format(tostring(oldContext)))
+			--spdlog.info(('GameSystemUI::PopGameContext(%q)'):format(tostring(oldContext)))
 
 			if isBraindance and oldContext.value == GameUI.Context.Scanning.value then
 				return
@@ -490,7 +539,7 @@ local function initialize(listen)
 		end)
 
 		Observe('gameuiGameSystemUI', 'SwapGameContext', function(_, oldContext, newContext)
-			spdlog.info(('GameSystemUI::SwapGameContext(%q, %q)'):format(tostring(oldContext), tostring(newContext)))
+			--spdlog.info(('GameSystemUI::SwapGameContext(%q, %q)'):format(tostring(oldContext), tostring(newContext)))
 
 			-- bugfix: new context is broken
 			if oldContext.value == GameUI.Context.Scanning.value then
@@ -504,7 +553,7 @@ local function initialize(listen)
 		end)
 
 		Observe('gameuiGameSystemUI', 'ResetGameContext', function()
-			spdlog.info(('GameSystemUI::ResetGameContext()'))
+			--spdlog.info(('GameSystemUI::ResetGameContext()'))
 
 			updateContext()
 			notifyObservers()
@@ -517,7 +566,6 @@ local function initialize(listen)
 
 	if not initialized.state then
 		refreshCurrentState()
-		--notifyObservers()
 
 		initialized.state = true
 	end
@@ -531,11 +579,19 @@ function GameUI.Observe(callback)
 	initialize()
 end
 
+function GameUI.Listen(event, callback)
+	if type(callback) == 'function' then
+		table.insert(listeners, { event = event, callback = callback })
+
+		initialize(event)
+	end
+end
+
 function GameUI.OnLoad(callback)
 	if type(callback) == 'function' then
 		table.insert(listeners, { event = GameUI.Event.Load, callback = callback })
 
-		initialize({ loading = true })
+		initialize(GameUI.Event.Load)
 	end
 end
 
@@ -543,7 +599,7 @@ function GameUI.OnLoaded(callback)
 	if type(callback) == 'function' then
 		table.insert(listeners, { event = GameUI.Event.Loaded, callback = callback })
 
-		initialize({ loading = true })
+		initialize(GameUI.Event.Loaded)
 	end
 end
 
@@ -551,7 +607,7 @@ function GameUI.OnFastTravel(callback)
 	if type(callback) == 'function' then
 		table.insert(listeners, { event = GameUI.Event.FastTravel, callback = callback })
 
-		initialize({ fastTravel = true })
+		initialize(GameUI.Event.FastTravel)
 	end
 end
 
@@ -559,7 +615,7 @@ function GameUI.OnFastTraveled(callback)
 	if type(callback) == 'function' then
 		table.insert(listeners, { event = GameUI.Event.FastTraveled, callback = callback })
 
-		initialize({ fastTravel = true })
+		initialize(GameUI.Event.FastTraveled)
 	end
 end
 
@@ -601,6 +657,10 @@ function GameUI.IsDevice()
 	return not isMenu and (context.value == GameUI.Context.DeviceZoom.value)
 end
 
+function GameUI.IsVehicle()
+	return isVehicle
+end
+
 function GameUI.IsBraindance()
 	return isBraindance
 end
@@ -621,6 +681,10 @@ function GameUI.GetSubmenu()
 	return currentSubmenu
 end
 
+function GameUI.GetCamera()
+	return currentCamera
+end
+
 function GameUI.GetContext()
 	return #contextStack > 0 and contextStack[#contextStack] or GameUI.Context.Default
 end
@@ -633,6 +697,7 @@ function GameUI.GetState()
 
 	currentState.isMenu = GameUI.IsAnyMenu()
 	currentState.isScene = GameUI.IsScene()
+	currentState.isVehicle = GameUI.IsVehicle()
 	currentState.isBraindance = GameUI.IsBraindance()
 	currentState.isFastTravel = GameUI.IsFastTravel()
 	currentState.isScanner = GameUI.IsScanner()
@@ -646,6 +711,7 @@ function GameUI.GetState()
 
 	currentState.menu = GameUI.GetMenu()
 	currentState.submenu = GameUI.GetSubmenu()
+	currentState.camera = GameUI.GetCamera()
 	currentState.context = GameUI.GetContext()
 
 	for _, stateProp in ipairs(stateProps) do
@@ -657,16 +723,12 @@ function GameUI.GetState()
 		end
 
 		if stateProp.event then
-			if type(stateProp.event) == 'table' then
-				if stateProp.event.start and currentValue and not previousValue then
-					currentState.event = stateProp.event.start
-				elseif stateProp.event.finish and not currentValue and previousValue then
-					currentState.event = stateProp.event.finish
-				end
-			else
-				if currentValue and not previousValue then
-					currentState.event = stateProp.event
-				end
+			if stateProp.event.on and currentValue and not previousValue then
+				currentState.event = stateProp.event.on
+			elseif stateProp.event.off and not currentValue and previousValue then
+				currentState.event = stateProp.event.off
+			elseif stateProp.event.change and tostring(currentValue) ~= tostring(previousValue) then
+				currentState.event = stateProp.event.change
 			end
 		end
 	end
@@ -680,7 +742,7 @@ function GameUI.ExportState(state)
 	for _, stateProp in ipairs(stateProps) do
 		local value = state[stateProp.current]
 
-		if value then
+		if value and (not stateProp.parent or state[stateProp.parent]) then
 			if type(value) == 'userdata' then
 				value = 'GameUI.Context.' .. value.value
 			elseif type(value) == 'string' then
@@ -743,6 +805,10 @@ function GameUI.PrintState(state, expanded, all)
 
 	if state.isScene or all then
 		print('- Scene:', state.isScene)
+	end
+
+	if state.isVehicle or all then
+		print('- Vehicle:', state.isVehicle, state.camera and '(' .. state.camera .. ')' or '')
 	end
 
 	if state.isBraindance or all then
