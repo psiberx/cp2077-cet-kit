@@ -67,10 +67,10 @@ local stateProps = {
 	{ current = 'isPopup', previous = 'wasPopup' },
 	{ current = 'isDevice', previous = 'wasDevice' },
 	{ current = 'isPhoto', previous = 'wasPhoto', event = { change = GameUI.Event.Photo } },
-	{ current = 'menu', previous = 'lastMenu', event = { change = GameUI.Event.Menu } },
-	{ current = 'submenu', previous = 'lastSubmenu', event = { change = GameUI.Event.Menu } },
 	{ current = 'camera', previous = 'lastCamera', event = { change = GameUI.Event.Camera }, parent = 'isVehicle' },
 	{ current = 'context', previous = 'lastContext', event = { change = GameUI.Event.Context } },
+	{ current = 'menu', previous = 'lastMenu', event = { change = GameUI.Event.Menu } },
+	{ current = 'submenu', previous = 'lastSubmenu', event = { change = GameUI.Event.Menu } },
 }
 
 local eventListens = {
@@ -722,7 +722,7 @@ function GameUI.GetState()
 			currentState[stateProp.previous] = previousValue
 		end
 
-		if stateProp.event then
+		if not currentState.event and stateProp.event then
 			if stateProp.event.on and currentValue and not previousValue then
 				currentState.event = stateProp.event.on
 			elseif stateProp.event.off and not currentValue and previousValue then
