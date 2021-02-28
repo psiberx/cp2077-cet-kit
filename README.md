@@ -18,7 +18,7 @@ Track Game UI state reactively. Doesn't use recurrent `onUpdate` checks.
  
 Current detections:
  
-- Load State (New Game, Load Game)
+- Game Session (New Game, Load Game, Exit to Main Menu)
 - Menus
   * Main Menu (Load Game, Settings, Credits)
   * New Game (Difficulty, Life Path, Body Type, Customization, Attributes, Summary)
@@ -29,7 +29,7 @@ Current detections:
   * Network Breach
   * Fast Travel
   * Stash
-- Special Scenes (Cutscenes, Dialogs, Mirrors)
+- Scenes (Cutscenes, Dialogs, Mirrors)
 - Scanning with Kiroshi Optics
 - Quickhacking with Cyberdeck
 - Devices (Computers, Terminals)
@@ -46,8 +46,10 @@ Todo:
 
 You can display own HUD elements and apply contextual logic depending on the current UI.
 
-If you don't need UI this module also can be used effectively to detect game loads.
-You can initialize mod state when the actual gameplay starts, and reset mod state, free resources when the game session ends.
+If you don't need UI, this module can be used to efficiently detect
+when a player is loading into the game or exiting the current game session. 
+You can initialize mod state when the actual gameplay starts, 
+and reset mod state and free resources when the game session ends.
 
 ## How to use
 
