@@ -23,8 +23,10 @@ Current detections:
   * Main Menu (Load Game, Settings, Credits)
   * New Game (Difficulty, Life Path, Body Type, Customization, Attributes, Summary)
   * Pause Menu (Save Game, Load Game, Settings, Credits) 
+  * Death Menu (Load Game, Settings)
   * Hub (Inventory, Backpack, Cyberware, Character, Stats, Crafting, Journal, Messages, Shards, Tarot, Database)
   * Vendor (Trade, RipperDoc, Drop Point)
+  * Network Breach
   * Fast Travel
   * Stash
 - Special Scenes (Cutscenes, Dialogs, Mirrors)
