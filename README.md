@@ -35,12 +35,12 @@ Current detections:
 - Devices (Computers, Terminals)
 - Popups (Weapon Wheel, Phone, Call Vehicle)
 - Braindance (Playback, Editing)
+- Vehicle (First Person, Third Person)
 - Fast Travel
 - Photo Mode
 
 Todo:
 
-- Vehicle FPP and TPP
 - Johnny's memories and takeovers 
 - Visibility of individual HUD elements 
 
