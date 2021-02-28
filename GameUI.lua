@@ -33,6 +33,23 @@ local currentMenu
 local currentSubmenu
 local contextStack = {}
 
+local stateProps = {
+	{ current = 'isLoading', previous = nil, event = 'Load' },
+	{ current = 'isLoaded', previous = nil, event = 'Loaded' },
+	{ current = 'isMenu', previous = 'wasMenu' },
+	{ current = 'isScene', previous = 'wasScene' },
+	{ current = 'isBraindance', previous = 'wasBraindance' },
+	{ current = 'isFastTravel', previous = 'wasFastTravel', event = { start = 'FastTravel', finish = 'FastTraveled' } },
+	{ current = 'isDefault', previous = 'wasDefault' },
+	{ current = 'isScanner', previous = 'wasScanner' },
+	{ current = 'isPopup', previous = 'wasPopup' },
+	{ current = 'isDevice', previous = 'wasDevice' },
+	{ current = 'isPhoto', previous = 'wasPhoto' },
+	{ current = 'menu', previous = 'lastMenu' },
+	{ current = 'submenu', previous = 'lastSubmenu' },
+	{ current = 'context', previous = 'lastContext' },
+}
+
 local menuScenarios = {
 	['MenuScenario_BodyTypeSelection'] = { menu = 'NewGame', submenu = 'BodyType' },
 	['MenuScenario_BoothMode'] = { menu = 'BoothMode', submenu = nil },
@@ -61,23 +78,6 @@ local menuScenarios = {
 	['MenuScenario_Storage'] = { menu = 'Stash', submenu = nil },
 	['MenuScenario_Summary'] = { menu = 'NewGame', submenu = 'Summary' },
 	['MenuScenario_Vendor'] = { menu = 'Vendor', submenu = nil },
-}
-
-local stateProps = {
-	'isLoading',
-	'isLoaded',
-	'isMenu',
-	'isScene',
-	'isBraindance',
-	'isFastTravel',
-	'isDefault',
-	'isScanner',
-	'isPopup',
-	'isDevice',
-	'isPhoto',
-	'menu',
-	'submenu',
-	'context',
 }
 
 local function toStudlyCase(s)
@@ -169,8 +169,8 @@ local function notifyObservers()
 	local stateChanged = false
 
 	for _, stateProp in ipairs(stateProps) do
-		local currentValue = currentState[stateProp]
-		local previousValue = previousState[stateProp]
+		local currentValue = currentState[stateProp.current]
+		local previousValue = previousState[stateProp.current]
 
 		if tostring(currentValue) ~= tostring(previousValue) then
 			stateChanged = true
@@ -243,11 +243,15 @@ local function initialize(listen)
 		Observe('RadialWheelController', 'OnIsInMenuChanged', function(menuActive)
 			spdlog.info(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(menuActive)))
 
-			if isLoading and not menuActive then
-				updateLoaded(true)
-				updateMenuScenario()
-				refreshCurrentState()
-				notifyObservers()
+			if isLoading then
+				if not menuActive then
+					updateLoaded(true)
+					updateMenuScenario()
+					refreshCurrentState()
+					notifyObservers()
+				end
+			else
+				updateMenu(menuActive)
 			end
 		end)
 
@@ -300,17 +304,14 @@ local function initialize(listen)
 				['OnSwitchToCredits'] = 'Credits',
 				['OnSwitchToHDRSettings'] = 'HDR',
 				['OnSwitchToLoadGame'] = 'LoadGame',
-				['OnSwitchToPauseMenu'] = false,
 				['OnSwitchToSaveGame'] = 'SaveGame',
 				['OnSwitchToSettings'] = 'Settings',
 			},
 			['MenuScenario_DeathMenu'] = {
-				--['OnCloseSettingsScreen'] = false,
 				['OnSwitchToBrightnessSettings'] = 'Brightness',
 				['OnSwitchToControllerPanel'] = 'Controller',
 				['OnSwitchToHDRSettings'] = 'HDR',
 				['OnSwitchToLoadGame'] = 'LoadGame',
-				--['OnMainMenuBack'] = false,
 				['OnSwitchToSettings'] = 'Settings',
 			},
 			['MenuScenario_Vendor'] = {
@@ -438,7 +439,7 @@ local function initialize(listen)
 		Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(finished)
 			spdlog.info(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
 
-			if finished then
+			if isFastTravel and finished then
 				updateFastTravel(false)
 				refreshCurrentState()
 				notifyObservers()
@@ -508,9 +509,43 @@ local function initialize(listen)
 end
 
 function GameUI.Observe(callback)
-	table.insert(observers, callback)
+	if type(callback) == 'function' then
+		table.insert(observers, callback)
+	end
 
 	initialize()
+end
+
+function GameUI.OnLoad(callback)
+	if type(callback) == 'function' then
+		table.insert(listeners, { event = 'Load', callback = callback })
+
+		initialize({ loading = true })
+	end
+end
+
+function GameUI.OnLoaded(callback)
+	if type(callback) == 'function' then
+		table.insert(listeners, { event = 'Loaded', callback = callback })
+
+		initialize({ loading = true })
+	end
+end
+
+function GameUI.OnFastTravel(callback)
+	if type(callback) == 'function' then
+		table.insert(listeners, { event = 'FastTravel', callback = callback })
+
+		initialize({ fastTravel = true })
+	end
+end
+
+function GameUI.OnFastTraveled(callback)
+	if type(callback) == 'function' then
+		table.insert(listeners, { event = 'FastTraveled', callback = callback })
+
+		initialize({ fastTravel = true })
+	end
 end
 
 function GameUI.IsLoading()
@@ -576,36 +611,59 @@ function GameUI.GetContext()
 end
 
 function GameUI.GetState()
-	local state = {}
+	local currentState = {}
 
-	state.isLoading = GameUI.IsLoading()
-	state.isLoaded = GameUI.IsLoaded()
+	currentState.isLoading = GameUI.IsLoading()
+	currentState.isLoaded = GameUI.IsLoaded()
 
-	state.isMenu = GameUI.IsAnyMenu()
-	state.isScene = GameUI.IsScene()
-	state.isBraindance = GameUI.IsBraindance()
-	state.isFastTravel = GameUI.IsFastTravel()
-	state.isScanner = GameUI.IsScanner()
-	state.isPopup = GameUI.IsPopup()
-	state.isDevice = GameUI.IsDevice()
-	state.isPhoto = GameUI.IsPhoto()
+	currentState.isMenu = GameUI.IsAnyMenu()
+	currentState.isScene = GameUI.IsScene()
+	currentState.isBraindance = GameUI.IsBraindance()
+	currentState.isFastTravel = GameUI.IsFastTravel()
+	currentState.isScanner = GameUI.IsScanner()
+	currentState.isPopup = GameUI.IsPopup()
+	currentState.isDevice = GameUI.IsDevice()
+	currentState.isPhoto = GameUI.IsPhoto()
 
-	state.isDefault = not state.isMenu and not state.isScene
-		and not state.isBraindance and not state.isFastTravel and not state.isPhoto
-		and not state.isScanner and not state.isPopup and not state.isDevice
+	currentState.isDefault = not currentState.isMenu and not currentState.isScene
+		and not currentState.isBraindance and not currentState.isFastTravel and not currentState.isPhoto
+		and not currentState.isScanner and not currentState.isPopup and not currentState.isDevice
 
-	state.menu = GameUI.GetMenu()
-	state.submenu = GameUI.GetSubmenu()
-	state.context = GameUI.GetContext()
+	currentState.menu = GameUI.GetMenu()
+	currentState.submenu = GameUI.GetSubmenu()
+	currentState.context = GameUI.GetContext()
 
-	return state
+	for _, stateProp in ipairs(stateProps) do
+		local currentValue = currentState[stateProp.current]
+		local previousValue = previousState[stateProp.current]
+
+		if stateProp.previous then
+			currentState[stateProp.previous] = previousValue
+		end
+
+		if stateProp.event then
+			if type(stateProp.event) == 'table' then
+				if stateProp.event.start and currentValue and not previousValue then
+					currentState.event = stateProp.event.start
+				elseif stateProp.event.finish and not currentValue and previousValue then
+					currentState.event = stateProp.event.finish
+				end
+			else
+				if currentValue and not previousValue then
+					currentState.event = stateProp.event
+				end
+			end
+		end
+	end
+
+	return currentState
 end
 
 function GameUI.ExportState(state)
 	local export = {}
 
-	for _, prop in ipairs(stateProps) do
-		local value = state[prop]
+	for _, stateProp in ipairs(stateProps) do
+		local value = state[stateProp.current]
 
 		if value then
 			if type(value) == 'userdata' then
@@ -616,8 +674,31 @@ function GameUI.ExportState(state)
 				value = tostring(value)
 			end
 
-			table.insert(export, prop .. ' = ' .. value)
+			table.insert(export, stateProp.current .. ' = ' .. value)
 		end
+	end
+
+	for _, stateProp in ipairs(stateProps) do
+		if stateProp.previous then
+			local currentValue = state[stateProp.current]
+			local previousValue = state[stateProp.previous]
+
+			if previousValue and previousValue ~= currentValue then
+				if type(previousValue) == 'userdata' then
+					previousValue = 'GameUI.Context.' .. previousValue.value
+				elseif type(previousValue) == 'string' then
+					previousValue = string.format('%q', previousValue)
+				else
+					previousValue = tostring(previousValue)
+				end
+
+				table.insert(export, stateProp.previous .. ' = ' .. previousValue)
+			end
+		end
+	end
+
+	if state.event then
+		table.insert(export, 'event = ' .. string.format('%q', state.event))
 	end
 
 	return '{ ' .. table.concat(export, ', ') .. ' }'
