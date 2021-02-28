@@ -23,6 +23,8 @@ registerForEvent('onInit', function()
 		elseif actionName == 'Jump' then
 			if actionType == 'BUTTON_PRESSED' then
 				print('[Action] Jump Pressed')
+			elseif actionType == 'BUTTON_HOLD_COMPLETE' then
+				print('[Action] Jump Charged')
 			elseif actionType == 'BUTTON_RELEASED' then
 				print('[Action] Jump Released')
 			end

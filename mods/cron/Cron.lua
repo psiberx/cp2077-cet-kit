@@ -1,6 +1,6 @@
 local Cron = {}
 
-local timers = {}
+local timers = { version = '1.0.0' }
 local counter = 0
 
 ---@param timeout number
