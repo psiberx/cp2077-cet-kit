@@ -304,6 +304,15 @@ local function initialize(listen)
 				['OnSwitchToSaveGame'] = 'SaveGame',
 				['OnSwitchToSettings'] = 'Settings',
 			},
+			['MenuScenario_DeathMenu'] = {
+				--['OnCloseSettingsScreen'] = false,
+				['OnSwitchToBrightnessSettings'] = 'Brightness',
+				['OnSwitchToControllerPanel'] = 'Controller',
+				['OnSwitchToHDRSettings'] = 'HDR',
+				['OnSwitchToLoadGame'] = 'LoadGame',
+				--['OnMainMenuBack'] = false,
+				['OnSwitchToSettings'] = 'Settings',
+			},
 			['MenuScenario_Vendor'] = {
 				['OnSwitchToVendor'] = 'Trade',
 				['OnSwitchToRipperDoc'] = 'RipperDoc',
@@ -323,17 +332,24 @@ local function initialize(listen)
 			end
 		end
 
-		Observe('MenuScenario_PauseMenu', 'GoBack', function(self)
-			spdlog.info(('MenuScenario_PauseMenu::GoBack()'))
+		local menuBackListeners = {
+			['MenuScenario_PauseMenu'] = 'GoBack',
+			['MenuScenario_DeathMenu'] = 'GoBack',
+		}
 
-			if Game.NameToString(self.prevMenuName) == 'settings_main' then
-				updateMenuItem('Settings')
-			else
-				updateMenuItem(false)
-			end
+		for menuScenario, menuBackEvent in pairs(menuBackListeners) do
+			Observe(menuScenario, menuBackEvent, function(self)
+				spdlog.info(('%s::%s()'):format(menuScenario, menuBackEvent))
 
-			notifyObservers()
-		end)
+				if Game.NameToString(self.prevMenuName) == 'settings_main' then
+					updateMenuItem('Settings')
+				else
+					updateMenuItem(false)
+				end
+
+				notifyObservers()
+			end)
+		end
 
 		Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
 			spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))

@@ -47,7 +47,7 @@ local menuScenarios = {
 	['MenuScenario_FindServers'] = { menu = 'FindServers', submenu = nil },
 	['MenuScenario_HubMenu'] = { menu = 'Hub', submenu = nil },
 	['MenuScenario_Idle'] = { menu = nil, submenu = nil },
-	['MenuScenario_LifePathSelection'] = { menu = 'NewGame', submenu = 'LifePathSelection' },
+	['MenuScenario_LifePathSelection'] = { menu = 'NewGame', submenu = 'LifePath' },
 	['MenuScenario_LoadGame'] = { menu = 'MainMenu', submenu = 'LoadGame' },
 	['MenuScenario_MultiplayerMenu'] = { menu = 'Multiplayer', submenu = nil },
 	['MenuScenario_NetworkBreach'] = { menu = 'NetworkBreach', submenu = nil },
@@ -282,13 +282,13 @@ local function initialize(listen)
 			notifyObservers()
 		end)
 
-		Observe('DropPointControllerPS', 'OnOpenVendorUI', function()
-			spdlog.info(('DropPointControllerPS::OnOpenVendorUI()'))
-
-			updateMenuScenario('MenuScenario_Vendor')
-			updateMenuItem('DropPoint')
-			notifyObservers()
-		end)
+		--Observe('DropPointControllerPS', 'OnOpenVendorUI', function()
+		--	spdlog.info(('DropPointControllerPS::OnOpenVendorUI()'))
+		--
+		--	updateMenuScenario('MenuScenario_Vendor')
+		--	updateMenuItem('DropPoint')
+		--	notifyObservers()
+		--end)
 
 		local menuItemListeners = {
 			['MenuScenario_SingleplayerMenu'] = {
@@ -304,35 +304,52 @@ local function initialize(listen)
 				['OnSwitchToSaveGame'] = 'SaveGame',
 				['OnSwitchToSettings'] = 'Settings',
 			},
+			['MenuScenario_DeathMenu'] = {
+				--['OnCloseSettingsScreen'] = false,
+				['OnSwitchToBrightnessSettings'] = 'Brightness',
+				['OnSwitchToControllerPanel'] = 'Controller',
+				['OnSwitchToHDRSettings'] = 'HDR',
+				['OnSwitchToLoadGame'] = 'LoadGame',
+				--['OnMainMenuBack'] = false,
+				['OnSwitchToSettings'] = 'Settings',
+			},
 			['MenuScenario_Vendor'] = {
-				['OnSwitchToVendor'] = 'Vendor',
+				['OnSwitchToVendor'] = 'Trade',
 				['OnSwitchToRipperDoc'] = 'RipperDoc',
 				['OnSwitchToCrafting'] = 'Crafting',
 			},
 		}
 
-		for menuController, menuItemEvents in pairs(menuItemListeners) do
+		for menuScenario, menuItemEvents in pairs(menuItemListeners) do
 			for menuEvent, menuItem in pairs(menuItemEvents) do
-				Observe(menuController, menuEvent, function()
-					spdlog.info(('%s::%s()'):format(menuController, menuEvent))
+				Observe(menuScenario, menuEvent, function()
+					spdlog.info(('%s::%s()'):format(menuScenario, menuEvent))
 
+					updateMenuScenario(menuScenario)
 					updateMenuItem(menuItem)
 					notifyObservers()
 				end)
 			end
 		end
 
-		Observe('MenuScenario_PauseMenu', 'GoBack', function(self)
-			spdlog.info(('MenuScenario_PauseMenu::GoBack()'))
+		local menuBackListeners = {
+			['MenuScenario_PauseMenu'] = 'GoBack',
+			['MenuScenario_DeathMenu'] = 'GoBack',
+		}
 
-			if Game.NameToString(self.prevMenuName) == 'settings_main' then
-				updateMenuItem('Settings')
-			else
-				updateMenuItem(false)
-			end
+		for menuScenario, menuBackEvent in pairs(menuBackListeners) do
+			Observe(menuScenario, menuBackEvent, function(self)
+				spdlog.info(('%s::%s()'):format(menuScenario, menuBackEvent))
 
-			notifyObservers()
-		end)
+				if Game.NameToString(self.prevMenuName) == 'settings_main' then
+					updateMenuItem('Settings')
+				else
+					updateMenuItem(false)
+				end
+
+				notifyObservers()
+			end)
+		end
 
 		Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
 			spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))
@@ -414,6 +431,7 @@ local function initialize(listen)
 
 			if tostring(fastTravelStart) ~= tostring(fastTravelDestination) then
 				updateFastTravel(true)
+				notifyObservers()
 			end
 		end)
 
