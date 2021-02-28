@@ -15,11 +15,12 @@ end)
 See `GameUI.PrintState()` for all state properties
 ]]
 
-local GameUI = {}
+local GameUI = { version = '0.8.1' }
 
-local isInitialized = false
-local notifiedState = { _ = false }
+local initialized = {}
 local observers = {}
+local listeners = {}
+local previousState = { _ = false }
 
 local isLoading = false
 local isLoaded = false
@@ -28,13 +29,44 @@ local isBraindance = false
 local isFastTravel = false
 local isPhotoMode = false
 local sceneTier = 4
+local currentMenu
+local currentSubmenu
 local contextStack = {}
+
+local menuScenarios = {
+	['MenuScenario_BodyTypeSelection'] = { menu = 'NewGame', submenu = 'BodyType' },
+	['MenuScenario_BoothMode'] = { menu = 'BoothMode', submenu = nil },
+	['MenuScenario_CharacterCustomization'] = { menu = 'NewGame', submenu = 'Customization' },
+	['MenuScenario_ClippedMenu'] = { menu = 'ClippedMenu', submenu = nil },
+	['MenuScenario_Credits'] = { menu = 'Credits', submenu = nil },
+	['MenuScenario_DeathMenu'] = { menu = 'DeathMenu', submenu = nil },
+	['MenuScenario_Difficulty'] = { menu = 'NewGame', submenu = 'Difficulty' },
+	['MenuScenario_E3EndMenu'] = { menu = 'E3EndMenu', submenu = nil },
+	['MenuScenario_FastTravel'] = { menu = 'FastTravel', submenu = 'Map' },
+	['MenuScenario_FinalBoards'] = { menu = 'FinalBoards', submenu = nil },
+	['MenuScenario_FindServers'] = { menu = 'FindServers', submenu = nil },
+	['MenuScenario_HubMenu'] = { menu = 'Hub', submenu = nil },
+	['MenuScenario_Idle'] = { menu = nil, submenu = nil },
+	['MenuScenario_LifePathSelection'] = { menu = 'NewGame', submenu = 'LifePathSelection' },
+	['MenuScenario_LoadGame'] = { menu = 'MainMenu', submenu = 'LoadGame' },
+	['MenuScenario_MultiplayerMenu'] = { menu = 'Multiplayer', submenu = nil },
+	['MenuScenario_NetworkBreach'] = { menu = 'NetworkBreach', submenu = nil },
+	['MenuScenario_NewGame'] = { menu = 'NewGame', submenu = nil },
+	['MenuScenario_PauseMenu'] = { menu = 'PauseMenu', submenu = nil },
+	['MenuScenario_PlayRecordedSession'] = { menu = 'PlayRecordedSession', submenu = nil },
+	['MenuScenario_PreGameSubMenu'] = { menu = 'PreGameSubMenu', submenu = nil },
+	['MenuScenario_Settings'] = { menu = 'MainMenu', submenu = 'Settings' },
+	['MenuScenario_SingleplayerMenu'] = { menu = 'MainMenu', submenu = nil },
+	['MenuScenario_StatsAdjustment'] = { menu = 'NewGame', submenu = 'Attributes' },
+	['MenuScenario_Storage'] = { menu = 'Stash', submenu = nil },
+	['MenuScenario_Summary'] = { menu = 'NewGame', submenu = 'Summary' },
+	['MenuScenario_Vendor'] = { menu = 'Vendor', submenu = nil },
+}
 
 local stateProps = {
 	'isLoading',
 	'isLoaded',
 	'isMenu',
-	'isMainMenu',
 	'isScene',
 	'isBraindance',
 	'isFastTravel',
@@ -43,23 +75,41 @@ local stateProps = {
 	'isPopup',
 	'isDevice',
 	'isPhoto',
+	'menu',
+	'submenu',
 	'context',
 }
+
+local function toStudlyCase(s)
+	return (s:lower():gsub('_*(%l)(%w*)', function(first, rest)
+		return string.upper(first) .. rest
+	end))
+end
 
 local function updateLoading(loading)
 	isLoading = loading
 	isLoaded = false
 end
 
+local function updateLoaded(loaded)
+	isLoading = not loaded
+	isLoaded = loaded
+end
+
 local function updateMenu(menuActive)
 	isMenu = menuActive or GameUI.IsMainMenu()
+end
 
-	if isLoading then
-		if not isMenu then
-			isLoading = false
-			isLoaded = true
-		end
-	end
+local function updateMenuScenario(scenarioName)
+	local scenario = menuScenarios[scenarioName] or menuScenarios['MenuScenario_Idle']
+
+	isMenu = scenario.menu ~= nil
+	currentMenu = scenario.menu
+	currentSubmenu = scenario.submenu
+end
+
+local function updateMenuItem(itemName)
+	currentSubmenu = itemName or nil
 end
 
 local function updateBraindance(braindanceActive)
@@ -118,10 +168,11 @@ local function notifyObservers()
 	local currentState = GameUI.GetState()
 	local stateChanged = false
 
-	for stateProp, notifiedValue in pairs(notifiedState) do
+	for _, stateProp in ipairs(stateProps) do
 		local currentValue = currentState[stateProp]
+		local previousValue = previousState[stateProp]
 
-		if tostring(notifiedValue) ~= tostring(currentValue) then
+		if tostring(currentValue) ~= tostring(previousValue) then
 			stateChanged = true
 			break
 		end
@@ -136,196 +187,312 @@ local function notifyObservers()
 			isLoaded = false
 		end
 
-		notifiedState = currentState
+		previousState = currentState
 	end
 end
 
-local function initialize()
-	GameUI.Context = {
-		Default = Enum.new('UIGameContext', 0),
-		QuickHack = Enum.new('UIGameContext', 1),
-		Scanning = Enum.new('UIGameContext', 2),
-		DeviceZoom = Enum.new('UIGameContext', 3),
-		BraindanceEditor = Enum.new('UIGameContext', 4),
-		BraindancePlayback = Enum.new('UIGameContext', 5),
-		VehicleMounted = Enum.new('UIGameContext', 6),
-		ModalPopup = Enum.new('UIGameContext', 7),
-		RadialWheel = Enum.new('UIGameContext', 8),
-		VehicleRace = Enum.new('UIGameContext', 9),
-	}
+local function initialize(listen)
+	if not initialized.data then
+		GameUI.Context = {
+			Default = Enum.new('UIGameContext', 0),
+			QuickHack = Enum.new('UIGameContext', 1),
+			Scanning = Enum.new('UIGameContext', 2),
+			DeviceZoom = Enum.new('UIGameContext', 3),
+			BraindanceEditor = Enum.new('UIGameContext', 4),
+			BraindancePlayback = Enum.new('UIGameContext', 5),
+			VehicleMounted = Enum.new('UIGameContext', 6),
+			ModalPopup = Enum.new('UIGameContext', 7),
+			RadialWheel = Enum.new('UIGameContext', 8),
+			VehicleRace = Enum.new('UIGameContext', 9),
+		}
 
-	Enum.__eq = function(a, b)
-		return a.value == b.value
+		Enum.__eq = function(a, b)
+			return a.value == b.value
+		end
+
+		initialized.data = true
+	end
+
+	if not listen then
+		listen = {
+			loading = true,
+			menu = true,
+			braindance = true,
+			sceneTier = true,
+			photoMode = true,
+			fastTravel = true,
+			context = true,
+		}
 	end
 
 	-- Loading State Listeners
 
-	Observe('PlayerPuppet', 'OnDetach', function()
-		--print(('PlayerPuppet::OnDetach()'))
+	if listen.loading and not initialized.loading then
+		Observe('PlayerPuppet', 'OnDetach', function()
+			spdlog.info(('PlayerPuppet::OnDetach()'))
 
-		if isMenu then
-			updateLoading(true)
-			updateBraindance(false)
-			updatePhotoMode(false)
-			updateContext()
-			notifyObservers()
-		end
-	end)
+			if isMenu then
+				updateLoading(true)
+				updateBraindance(false)
+				updatePhotoMode(false)
+				updateContext()
+				notifyObservers()
+			end
+		end)
+
+		Observe('RadialWheelController', 'OnIsInMenuChanged', function(menuActive)
+			spdlog.info(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(menuActive)))
+
+			if isLoading and not menuActive then
+				updateLoaded(true)
+				updateMenuScenario()
+				refreshCurrentState()
+				notifyObservers()
+			end
+		end)
+
+		initialized.loading = true
+	end
 
 	-- Menu State Listeners
 
-	Observe('RadialWheelController', 'OnIsInMenuChanged', function(menuActive)
-		--print(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(menuActive)))
+	if listen.menu and not initialized.menu then
+		Observe('inkMenuScenario', 'SwitchToScenario', function(_, menuName)
+			spdlog.info(('inkMenuScenario::SwitchToScenario(%q)'):format(Game.NameToString(menuName)))
 
-		updateMenu(menuActive)
+			updateMenuScenario(Game.NameToString(menuName))
+			notifyObservers()
+		end)
 
-		if isLoaded then
-			refreshCurrentState()
+		--Observe('MenuScenario_BaseMenu', 'SwitchMenu', function(self, menuName)
+		--	print('SwitchMenu', Game.NameToString(menuName))
+		--end)
+
+		Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(menuItemData)
+			spdlog.info(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
+
+			updateMenuItem(toStudlyCase(menuItemData.menuData.label))
+			notifyObservers()
+		end)
+
+		Observe('MenuScenario_HubMenu', 'OnCloseHubMenu', function(_)
+			spdlog.info(('MenuScenario_HubMenu::OnCloseHubMenu()'))
+
+			updateMenuItem(false)
+			notifyObservers()
+		end)
+
+		Observe('DropPointControllerPS', 'OnOpenVendorUI', function()
+			spdlog.info(('DropPointControllerPS::OnOpenVendorUI()'))
+
+			updateMenuScenario('MenuScenario_Vendor')
+			updateMenuItem('DropPoint')
+			notifyObservers()
+		end)
+
+		local menuItemListeners = {
+			['MenuScenario_SingleplayerMenu'] = {
+				['OnLoadGame'] = 'LoadGame',
+			},
+			['MenuScenario_PauseMenu'] = {
+				['OnSwitchToBrightnessSettings'] = 'Brightness',
+				['OnSwitchToControllerPanel'] = 'Controller',
+				['OnSwitchToCredits'] = 'Credits',
+				['OnSwitchToHDRSettings'] = 'HDR',
+				['OnSwitchToLoadGame'] = 'LoadGame',
+				['OnSwitchToPauseMenu'] = false,
+				['OnSwitchToSaveGame'] = 'SaveGame',
+				['OnSwitchToSettings'] = 'Settings',
+			},
+			['MenuScenario_Vendor'] = {
+				['OnSwitchToVendor'] = 'Vendor',
+				['OnSwitchToRipperDoc'] = 'RipperDoc',
+				['OnSwitchToCrafting'] = 'Crafting',
+			},
+		}
+
+		for menuController, menuItemEvents in pairs(menuItemListeners) do
+			for menuEvent, menuItem in pairs(menuItemEvents) do
+				Observe(menuController, menuEvent, function()
+					spdlog.info(('%s::%s()'):format(menuController, menuEvent))
+
+					updateMenuItem(menuItem)
+					notifyObservers()
+				end)
+			end
 		end
 
-		notifyObservers()
-	end)
+		Observe('MenuScenario_PauseMenu', 'GoBack', function(self)
+			spdlog.info(('MenuScenario_PauseMenu::GoBack()'))
 
-	Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
-		--print(('SingleplayerMenuGameController::OnSavesReady()'))
+			if Game.NameToString(self.prevMenuName) == 'settings_main' then
+				updateMenuItem('Settings')
+			else
+				updateMenuItem(false)
+			end
 
-		updateLoading(false)
-		updateMenu(true)
-		updateBraindance(false)
-		updatePhotoMode(false)
-		updateSceneTier(4)
-		notifyObservers()
-	end)
+			notifyObservers()
+		end)
+
+		Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
+			spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))
+
+			updateLoading(false)
+			updateMenuScenario('MenuScenario_SingleplayerMenu')
+			updateBraindance(false)
+			updatePhotoMode(false)
+			updateSceneTier(4)
+			notifyObservers()
+		end)
+
+		initialized.menu = true
+	end
 
 	-- Braindance State Listeners
 
-	Observe('BraindanceGameController', 'OnIsActiveUpdated', function(braindanceActive)
-		--print(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
+	if listen.braindance and not initialized.braindance then
+		Observe('BraindanceGameController', 'OnIsActiveUpdated', function(braindanceActive)
+			spdlog.info(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
 
-		updateBraindance(braindanceActive)
-		notifyObservers()
-	end)
+			updateBraindance(braindanceActive)
+			notifyObservers()
+		end)
 
-	-- Scene State Listeners
+		initialized.braindance = true
+	end
 
-	Observe('CrosshairGameController_NoWeapon', 'OnPSMSceneTierChanged', function(sceneTierValue)
-		--print(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
+	-- Scene Tier Listeners
 
-		updateSceneTier(sceneTierValue)
-		notifyObservers()
-	end)
+	if listen.sceneTier and not initialized.sceneTier then
+		Observe('CrosshairGameController_NoWeapon', 'OnPSMSceneTierChanged', function(sceneTierValue)
+			spdlog.info(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
+
+			updateSceneTier(sceneTierValue)
+			notifyObservers()
+		end)
+
+		initialized.sceneTier = true
+	end
 
 	-- Photo Mode Listeners
 
-	Observe('gameuiPhotoModeMenuController', 'OnShow', function()
-		--print(('PhotoModeMenuController::OnShow()'))
+	if listen.photoMode and not initialized.photoMode then
+		Observe('gameuiPhotoModeMenuController', 'OnShow', function()
+			spdlog.info(('PhotoModeMenuController::OnShow()'))
 
-		updatePhotoMode(true)
-		notifyObservers()
-	end)
+			updatePhotoMode(true)
+			notifyObservers()
+		end)
 
-	Observe('gameuiPhotoModeMenuController', 'OnHide', function()
-		--print(('PhotoModeMenuController::OnHide()'))
+		Observe('gameuiPhotoModeMenuController', 'OnHide', function()
+			spdlog.info(('PhotoModeMenuController::OnHide()'))
 
-		updatePhotoMode(false)
-		notifyObservers()
-	end)
+			updatePhotoMode(false)
+			notifyObservers()
+		end)
 
-	-- UI Context Listeners
-
-	Observe('gameuiGameSystemUI', 'PushGameContext', function(self, newContext)
-		--print(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
-
-		if isBraindance and newContext.value == GameUI.Context.Scanning.value then
-			return
-		end
-
-		updateContext(nil, newContext)
-		notifyObservers()
-	end)
-
-	Observe('gameuiGameSystemUI', 'PopGameContext', function(self, oldContext)
-		--print(('GameSystemUI::PopGameContext(%q)'):format(tostring(oldContext)))
-
-		if isBraindance and oldContext.value == GameUI.Context.Scanning.value then
-			return
-		end
-
-		updateContext(oldContext, nil)
-		notifyObservers()
-	end)
-
-	Observe('gameuiGameSystemUI', 'SwapGameContext', function(self, oldContext, newContext)
-		--print(('GameSystemUI::SwapGameContext(%q, %q)'):format(tostring(oldContext), tostring(newContext)))
-
-		-- bugfix: new context is broken
-		if oldContext.value == GameUI.Context.Scanning.value then
-			newContext = GameUI.Context.QuickHack
-		elseif oldContext.value == GameUI.Context.QuickHack.value then
-			newContext = GameUI.Context.Scanning
-		end
-
-		updateContext(oldContext, newContext)
-		notifyObservers()
-	end)
-
-	Observe('gameuiGameSystemUI', 'ResetGameContext', function()
-		--print(('GameSystemUI::ResetGameContext()'))
-
-		updateContext()
-		notifyObservers()
-	end)
+		initialized.photoMode = true
+	end
 
 	-- Fast Travel Listeners
 
-	local fastTravelStart
+	if listen.fastTravel and not initialized.fastTravel then
+		local fastTravelStart
 
-	Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(request)
-		--print(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
+		Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(request)
+			spdlog.info(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
 
-		if request.isEnabled then
-			fastTravelStart = request.pointRecord
-		end
-	end)
+			if request.isEnabled then
+				fastTravelStart = request.pointRecord
+			end
+		end)
 
-	Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(request)
-		--print(('FastTravelSystem::OnPerformFastTravelRequest()'))
+		Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(request)
+			spdlog.info(('FastTravelSystem::OnPerformFastTravelRequest()'))
 
-		local fastTravelDestination = request.pointData.pointRecord
+			local fastTravelDestination = request.pointData.pointRecord
 
-		if tostring(fastTravelStart) ~= tostring(fastTravelDestination) then
-			updateFastTravel(true)
-		end
-	end)
+			if tostring(fastTravelStart) ~= tostring(fastTravelDestination) then
+				updateFastTravel(true)
+			end
+		end)
 
-	Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(finished)
-		--print(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
+		Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(finished)
+			spdlog.info(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
 
-		if finished then
-			updateFastTravel(false)
-			refreshCurrentState()
+			if finished then
+				updateFastTravel(false)
+				refreshCurrentState()
+				notifyObservers()
+			end
+		end)
+
+		initialized.fastTravel = true
+	end
+
+	-- UI Context Listeners
+
+	if listen.context and not initialized.context then
+		Observe('gameuiGameSystemUI', 'PushGameContext', function(_, newContext)
+			spdlog.info(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
+
+			if isBraindance and newContext.value == GameUI.Context.Scanning.value then
+				return
+			end
+
+			updateContext(nil, newContext)
 			notifyObservers()
-		end
-	end)
+		end)
+
+		Observe('gameuiGameSystemUI', 'PopGameContext', function(_, oldContext)
+			spdlog.info(('GameSystemUI::PopGameContext(%q)'):format(tostring(oldContext)))
+
+			if isBraindance and oldContext.value == GameUI.Context.Scanning.value then
+				return
+			end
+
+			updateContext(oldContext, nil)
+			notifyObservers()
+		end)
+
+		Observe('gameuiGameSystemUI', 'SwapGameContext', function(_, oldContext, newContext)
+			spdlog.info(('GameSystemUI::SwapGameContext(%q, %q)'):format(tostring(oldContext), tostring(newContext)))
+
+			-- bugfix: new context is broken
+			if oldContext.value == GameUI.Context.Scanning.value then
+				newContext = GameUI.Context.QuickHack
+			elseif oldContext.value == GameUI.Context.QuickHack.value then
+				newContext = GameUI.Context.Scanning
+			end
+
+			updateContext(oldContext, newContext)
+			notifyObservers()
+		end)
+
+		Observe('gameuiGameSystemUI', 'ResetGameContext', function()
+			spdlog.info(('GameSystemUI::ResetGameContext()'))
+
+			updateContext()
+			notifyObservers()
+		end)
+
+		initialized.context = true
+	end
 
 	-- Initial state
 
-	refreshCurrentState()
-	notifyObservers()
+	if not initialized.state then
+		refreshCurrentState()
+		--notifyObservers()
+
+		initialized.state = true
+	end
 end
 
 function GameUI.Observe(callback)
 	table.insert(observers, callback)
 
-	if not isInitialized then
-		initialize()
-
-		isInitialized = true
-	end
-end
-
-function GameUI.IsReady()
-	return isInitialized
+	initialize()
 end
 
 function GameUI.IsLoading()
@@ -378,6 +545,14 @@ function GameUI.IsPhoto()
 	return isPhotoMode
 end
 
+function GameUI.GetMenu()
+	return currentMenu
+end
+
+function GameUI.GetSubmenu()
+	return currentSubmenu
+end
+
 function GameUI.GetContext()
 	return #contextStack > 0 and contextStack[#contextStack] or GameUI.Context.Default
 end
@@ -389,7 +564,6 @@ function GameUI.GetState()
 	state.isLoaded = GameUI.IsLoaded()
 
 	state.isMenu = GameUI.IsAnyMenu()
-	state.isMainMenu = GameUI.IsMainMenu()
 	state.isScene = GameUI.IsScene()
 	state.isBraindance = GameUI.IsBraindance()
 	state.isFastTravel = GameUI.IsFastTravel()
@@ -402,6 +576,8 @@ function GameUI.GetState()
 		and not state.isBraindance and not state.isFastTravel and not state.isPhoto
 		and not state.isScanner and not state.isPopup and not state.isDevice
 
+	state.menu = GameUI.GetMenu()
+	state.submenu = GameUI.GetSubmenu()
 	state.context = GameUI.GetContext()
 
 	return state
@@ -416,6 +592,8 @@ function GameUI.ExportState(state)
 		if value then
 			if type(value) == 'userdata' then
 				value = 'GameUI.Context.' .. value.value
+			elseif type(value) == 'string' then
+				value = string.format('%q', value)
 			else
 				value = tostring(value)
 			end
@@ -435,6 +613,10 @@ function GameUI.PrintState(state, expanded, all)
 
 	print('[UI State]')
 
+	if state.event then
+		print('- Event:', state.event)
+	end
+
 	if state.isLoading then
 		print('- Loading:', state.isLoading)
 	elseif state.isLoaded then
@@ -442,7 +624,7 @@ function GameUI.PrintState(state, expanded, all)
 	end
 
 	if state.isMenu or all then
-		print('- Menu:', state.isMenu, state.isMainMenu and '(Main Menu)' or '')
+		print('- Menu:', state.isMenu, state.menu and '(' .. state.menu .. (state.submenu and ' / ' .. state.submenu or '') .. ')' or '')
 	end
 
 	if state.isScene or all then

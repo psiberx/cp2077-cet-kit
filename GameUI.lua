@@ -109,7 +109,7 @@ local function updateMenuScenario(scenarioName)
 end
 
 local function updateMenuItem(itemName)
-	currentSubmenu = itemName
+	currentSubmenu = itemName or nil
 end
 
 local function updateBraindance(braindanceActive)
@@ -278,7 +278,7 @@ local function initialize(listen)
 		Observe('MenuScenario_HubMenu', 'OnCloseHubMenu', function(_)
 			spdlog.info(('MenuScenario_HubMenu::OnCloseHubMenu()'))
 
-			updateMenuItem()
+			updateMenuItem(false)
 			notifyObservers()
 		end)
 
@@ -291,21 +291,48 @@ local function initialize(listen)
 		end)
 
 		local menuItemListeners = {
+			['MenuScenario_SingleplayerMenu'] = {
+				['OnLoadGame'] = 'LoadGame',
+			},
+			['MenuScenario_PauseMenu'] = {
+				['OnSwitchToBrightnessSettings'] = 'Brightness',
+				['OnSwitchToControllerPanel'] = 'Controller',
+				['OnSwitchToCredits'] = 'Credits',
+				['OnSwitchToHDRSettings'] = 'HDR',
+				['OnSwitchToLoadGame'] = 'LoadGame',
+				['OnSwitchToPauseMenu'] = false,
+				['OnSwitchToSaveGame'] = 'SaveGame',
+				['OnSwitchToSettings'] = 'Settings',
+			},
 			['MenuScenario_Vendor'] = {
 				['OnSwitchToVendor'] = 'Vendor',
 				['OnSwitchToRipperDoc'] = 'RipperDoc',
 				['OnSwitchToCrafting'] = 'Crafting',
-			}
+			},
 		}
 
 		for menuController, menuItemEvents in pairs(menuItemListeners) do
 			for menuEvent, menuItem in pairs(menuItemEvents) do
 				Observe(menuController, menuEvent, function()
+					spdlog.info(('%s::%s()'):format(menuController, menuEvent))
+
 					updateMenuItem(menuItem)
 					notifyObservers()
 				end)
 			end
 		end
+
+		Observe('MenuScenario_PauseMenu', 'GoBack', function(self)
+			spdlog.info(('MenuScenario_PauseMenu::GoBack()'))
+
+			if Game.NameToString(self.prevMenuName) == 'settings_main' then
+				updateMenuItem('Settings')
+			else
+				updateMenuItem(false)
+			end
+
+			notifyObservers()
+		end)
 
 		Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
 			spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))
