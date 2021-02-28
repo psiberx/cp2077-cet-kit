@@ -90,8 +90,7 @@ end)
 local GameUI = require('GameUI')
 
 registerForEvent('onInit', function()
-    -- Listen for state changes
-    -- See GameUI.PrintState() for all state props
+    -- Listen for every UI state change
     GameUI.Observe(function(state)
         GameUI.PrintState(state)
     end)
@@ -116,6 +115,22 @@ registerForEvent('onInit', function()
         -- and the current game session ended
         -- (including when the player selects "Exit to Main Menu")
         print('Unloaded')
+    end)
+end)
+```
+
+### Track Fast Traveling
+
+```lua
+local GameUI = require('GameUI')
+
+registerForEvent('onInit', function()
+    GameUI.OnFastTravel(function()
+        print('Fast Travel Started')
+    end)
+
+    GameUI.OnFastTraveled(function()
+        print('Fast Travel Finished')
     end)
 end)
 ```
