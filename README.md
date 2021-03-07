@@ -29,11 +29,13 @@ Current detections:
   * Network Breach
   * Fast Travel
   * Stash
+- Loading Screen
 - Scenes (Cutscenes, Dialogs, Mirrors)
 - Scanning with Kiroshi Optics
 - Quickhacking with Cyberdeck
 - Devices (Computers, Terminals)
-- Popups (Weapon Wheel, Phone, Call Vehicle)
+- Popups (Phone, Call Vehicle)
+- Weapon Wheel
 - Braindance (Playback, Editing)
 - Vehicle (First Person, Third Person)
 - Fast Travel
@@ -41,6 +43,7 @@ Current detections:
 
 Todo:
 
+- Virtual Reality
 - Johnny's memories and takeovers 
 - Visibility of individual HUD elements 
 
@@ -105,16 +108,16 @@ end)
 local GameUI = require('GameUI')
 
 registerForEvent('onInit', function()
-    GameUI.OnLoaded(function()
+    GameUI.OnSessionStart(function()
         -- Triggered once the load is complete and the player is in the game
         -- (after the loading screen for "Load Game" or "New Game")
-        print('Loaded')
+        print('Game Session Started')
     end)
 
-    GameUI.OnUnloaded(function()
+    GameUI.OnSessionEnd(function()
         -- Triggered once the current game session has ended
         -- (when "Load Game" or "Exit to Main Menu" selected)
-        print('Unloaded')
+        print('Game Session Ended')
     end)
 end)
 ```
@@ -125,11 +128,11 @@ end)
 local GameUI = require('GameUI')
 
 registerForEvent('onInit', function()
-    GameUI.OnFastTravel(function()
+    GameUI.OnFastTravelStart(function()
         print('Fast Travel Started')
     end)
 
-    GameUI.OnFastTraveled(function()
+    GameUI.OnFastTravelFinish(function()
         print('Fast Travel Finished')
     end)
 end)
