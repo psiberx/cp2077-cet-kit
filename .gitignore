@@ -2,4 +2,5 @@
 .idea
 *.log
 *.sqlite3
+/export.lua
 /init.lua
