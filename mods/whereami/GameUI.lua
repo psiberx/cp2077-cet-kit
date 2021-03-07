@@ -113,7 +113,7 @@ local stateProps = {
 	{ current = 'isDetached', previous = nil, event = { change = GameUI.Event.Session, on = GameUI.Event.SessionEnd } },
 	{ current = 'isLoading', previous = 'wasLoading', event = { change = GameUI.Event.Loading, on = GameUI.Event.LoadingStart, off = GameUI.Event.LoadingFinish } },
 	{ current = 'isMenu', previous = 'wasMenu', event = { change = GameUI.Event.Menu, on = GameUI.Event.MenuOpen, off = GameUI.Event.MenuClose } },
-	{ current = 'isScene', previous = 'wasScene', event = { change = GameUI.Event.Scene, on = GameUI.Event.SceneEnter, off = GameUI.Event.SceneExit } },
+	{ current = 'isScene', previous = 'wasScene', event = { change = GameUI.Event.Scene, on = GameUI.Event.SceneEnter, off = GameUI.Event.SceneExit, reqs = { isMenu = false } } },
 	{ current = 'isVehicle', previous = 'wasVehicle', event = { change = GameUI.Event.Vehicle, on = GameUI.Event.VehicleEnter, off = GameUI.Event.VehicleExit } },
 	{ current = 'isBraindance', previous = 'wasBraindance', event = { change = GameUI.Event.Braindance, on = GameUI.Event.BraindanceEnter, off = GameUI.Event.BraindanceExit } },
 	{ current = 'isFastTravel', previous = 'wasFastTravel', event = { change = GameUI.Event.FastTravel, on = GameUI.Event.FastTravelStart, off = GameUI.Event.FastTravelFinish } },
@@ -161,7 +161,8 @@ local menuScenarios = {
 }
 
 local eventScopes = {
-	[GameUI.Event.Update] = {}
+	[GameUI.Event.Update] = {},
+	[GameUI.Event.Menu] = { [GameUI.Event.Loading] = true },
 }
 
 local function toStudlyCase(s)
@@ -406,7 +407,7 @@ local function initialize(event)
 	if required[GameUI.Event.Session] and not initialized[GameUI.Event.Session] then
 		
 		Observe('RadialWheelController', 'RegisterBlackboards', function(_, loaded)
-			--spdlog.info(('RadialWheelController::RegisterBlackboards(%s)'):format(tostring(loaded)))
+			--spdlog.error(('RadialWheelController::RegisterBlackboards(%s)'):format(tostring(loaded)))
 
 			if loaded then
 				updateLoaded(true)
@@ -434,7 +435,7 @@ local function initialize(event)
 
 	if required[GameUI.Event.Loading] and not initialized[GameUI.Event.Loading] then
 		Observe('LoadingScreenProgressBarController', 'OnInitialize', function()
-			--spdlog.info(('LoadingScreenProgressBarController::OnInitialize()'))
+			--spdlog.error(('LoadingScreenProgressBarController::OnInitialize()'))
 
 			updateMenuScenario()
 			updateLoading(true)
@@ -442,10 +443,13 @@ local function initialize(event)
 		end)
 
 		Observe('LoadingScreenProgressBarController', 'SetProgress', function(_, progress)
-			--spdlog.info(('LoadingScreenProgressBarController::SetProgress(%.3f)'):format(progress))
+			--spdlog.error(('LoadingScreenProgressBarController::SetProgress(%.3f)'):format(progress))
 
 			if progress == 1.0 then
-				updateMenuScenario()
+				if currentMenu ~= 'MainMenu' then
+					updateMenuScenario()
+				end
+
 				updateLoading(false)
 				notifyObservers()
 			end
@@ -458,7 +462,7 @@ local function initialize(event)
 
 	if required[GameUI.Event.Menu] and not initialized[GameUI.Event.Menu] then
 		Observe('inkMenuScenario', 'SwitchToScenario', function(_, menuName)
-			--spdlog.info(('inkMenuScenario::SwitchToScenario(%q)'):format(Game.NameToString(menuName)))
+			--spdlog.error(('inkMenuScenario::SwitchToScenario(%q)'):format(Game.NameToString(menuName)))
 			Game.GetPlayer() -- env fix
 
 			updateMenuScenario(Game.NameToString(menuName))
@@ -466,7 +470,7 @@ local function initialize(event)
 		end)
 
 		Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(menuItemData)
-			--spdlog.info(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
+			--spdlog.error(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
 			Game.GetPlayer() -- env fix
 
 			updateMenuItem(toStudlyCase(menuItemData.menuData.label))
@@ -474,7 +478,7 @@ local function initialize(event)
 		end)
 
 		Observe('MenuScenario_HubMenu', 'OnCloseHubMenu', function(_)
-			--spdlog.info(('MenuScenario_HubMenu::OnCloseHubMenu()'))
+			--spdlog.error(('MenuScenario_HubMenu::OnCloseHubMenu()'))
 
 			updateMenuItem(false)
 			notifyObservers()
@@ -510,7 +514,7 @@ local function initialize(event)
 		for menuScenario, menuItemEvents in pairs(menuItemListeners) do
 			for menuEvent, menuItem in pairs(menuItemEvents) do
 				Observe(menuScenario, menuEvent, function()
-					--spdlog.info(('%s::%s()'):format(menuScenario, menuEvent))
+					--spdlog.error(('%s::%s()'):format(menuScenario, menuEvent))
 
 					updateMenuScenario(menuScenario)
 					updateMenuItem(menuItem)
@@ -526,7 +530,7 @@ local function initialize(event)
 
 		for menuScenario, menuBackEvent in pairs(menuBackListeners) do
 			Observe(menuScenario, menuBackEvent, function(self)
-				--spdlog.info(('%s::%s()'):format(menuScenario, menuBackEvent))
+				--spdlog.error(('%s::%s()'):format(menuScenario, menuBackEvent))
 
 				if Game.NameToString(self.prevMenuName) == 'settings_main' then
 					updateMenuItem('Settings')
@@ -539,14 +543,12 @@ local function initialize(event)
 		end
 
 		Observe('SingleplayerMenuGameController', 'OnSavesReady', function()
-			--spdlog.info(('SingleplayerMenuGameController::OnSavesReady()'))
+			--spdlog.error(('SingleplayerMenuGameController::OnSavesReady()'))
 
-			--updateDetached(false)
 			updateMenuScenario('MenuScenario_SingleplayerMenu')
 			updateBraindance(false)
 			updatePhotoMode(false)
 			updateSceneTier(4)
-			notifyObservers()
 		end)
 
 		initialized[GameUI.Event.Menu] = true
@@ -556,14 +558,14 @@ local function initialize(event)
 
 	if required[GameUI.Event.Vehicle] and not initialized[GameUI.Event.Vehicle] then
 		Observe('hudCarController', 'OnCameraModeChanged', function(mode)
-			--spdlog.info(('hudCarController::OnCameraModeChanged(%s)'):format(tostring(mode)))
+			--spdlog.error(('hudCarController::OnCameraModeChanged(%s)'):format(tostring(mode)))
 
 			updateVehicle(true, mode)
 			notifyObservers()
 		end)
 
 		Observe('hudCarController', 'OnUnmountingEvent', function()
-			--spdlog.info(('hudCarController::OnUnmountingEvent()'))
+			--spdlog.error(('hudCarController::OnUnmountingEvent()'))
 
 			updateVehicle(false)
 			notifyObservers()
@@ -576,7 +578,7 @@ local function initialize(event)
 
 	if required[GameUI.Event.Braindance] and not initialized[GameUI.Event.Braindance] then
 		Observe('BraindanceGameController', 'OnIsActiveUpdated', function(braindanceActive)
-			--spdlog.info(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
+			--spdlog.error(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
 
 			updateBraindance(braindanceActive)
 			notifyObservers()
@@ -589,7 +591,7 @@ local function initialize(event)
 
 	if required[GameUI.Event.Scene] and not initialized[GameUI.Event.Scene] then
 		Observe('CrosshairGameController_NoWeapon', 'OnPSMSceneTierChanged', function(sceneTierValue)
-			--spdlog.info(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
+			--spdlog.error(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
 
 			updateSceneTier(sceneTierValue)
 			notifyObservers()
@@ -602,14 +604,14 @@ local function initialize(event)
 
 	if required[GameUI.Event.PhotoMode] and not initialized[GameUI.Event.PhotoMode] then
 		Observe('gameuiPhotoModeMenuController', 'OnShow', function()
-			--spdlog.info(('PhotoModeMenuController::OnShow()'))
+			--spdlog.error(('PhotoModeMenuController::OnShow()'))
 
 			updatePhotoMode(true)
 			notifyObservers()
 		end)
 
 		Observe('gameuiPhotoModeMenuController', 'OnHide', function()
-			--spdlog.info(('PhotoModeMenuController::OnHide()'))
+			--spdlog.error(('PhotoModeMenuController::OnHide()'))
 
 			updatePhotoMode(false)
 			notifyObservers()
@@ -624,7 +626,7 @@ local function initialize(event)
 		local fastTravelStart
 
 		Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(request)
-			--spdlog.info(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
+			--spdlog.error(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
 
 			if request.isEnabled then
 				fastTravelStart = request.pointRecord
@@ -632,7 +634,7 @@ local function initialize(event)
 		end)
 
 		Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(request)
-			--spdlog.info(('FastTravelSystem::OnPerformFastTravelRequest()'))
+			--spdlog.error(('FastTravelSystem::OnPerformFastTravelRequest()'))
 
 			local fastTravelDestination = request.pointData.pointRecord
 
@@ -644,7 +646,7 @@ local function initialize(event)
 		end)
 
 		Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(finished)
-			--spdlog.info(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
+			--spdlog.error(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
 
 			if isFastTravel and finished then
 				updateLoading(false)
@@ -661,7 +663,7 @@ local function initialize(event)
 
 	if required[GameUI.Event.Context] and not initialized[GameUI.Event.Context] then
 		Observe('gameuiGameSystemUI', 'PushGameContext', function(_, newContext)
-			--spdlog.info(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
+			--spdlog.error(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
 
 			if isBraindance and newContext.value == GameUI.Context.Scanning.value then
 				return
@@ -672,7 +674,7 @@ local function initialize(event)
 		end)
 
 		Observe('gameuiGameSystemUI', 'PopGameContext', function(_, oldContext)
-			--spdlog.info(('GameSystemUI::PopGameContext(%q)'):format(tostring(oldContext)))
+			--spdlog.error(('GameSystemUI::PopGameContext(%q)'):format(tostring(oldContext)))
 
 			if isBraindance and oldContext.value == GameUI.Context.Scanning.value then
 				return
@@ -687,7 +689,7 @@ local function initialize(event)
 		end)
 
 		Observe('HUDManager', 'OnQuickHackUIVisibleChanged', function(quickhacking)
-			--spdlog.info(('HUDManager::OnQuickHackUIVisibleChanged(%s)'):format(tostring(quickhacking)))
+			--spdlog.error(('HUDManager::OnQuickHackUIVisibleChanged(%s)'):format(tostring(quickhacking)))
 
 			if quickhacking then
 				updateContext(GameUI.Context.Scanning, GameUI.Context.QuickHack)
@@ -699,7 +701,7 @@ local function initialize(event)
 		end)
 
 		Observe('gameuiGameSystemUI', 'ResetGameContext', function()
-			--spdlog.info(('GameSystemUI::ResetGameContext()'))
+			--spdlog.error(('GameSystemUI::ResetGameContext()'))
 
 			updateContext()
 			notifyObservers()
