@@ -306,7 +306,7 @@ local function determineEvents(currentState)
 					end
 				elseif stateProp.event.off and not currentValue and previousValue then
 					if not firing[stateProp.event.off] then
-						table.insert(events, stateProp.event.off)
+						table.insert(events, 1, stateProp.event.off)
 						firing[stateProp.event.off] = true
 					end
 				end
@@ -757,13 +757,13 @@ end
 function GameUI.IsScanner()
 	local context = GameUI.GetContext()
 
-	return not isMenu and (context.value == GameUI.Context.Scanning.value)
+	return not isMenu and not isLoading and not isFastTravel and (context.value == GameUI.Context.Scanning.value)
 end
 
 function GameUI.IsQuickHack()
 	local context = GameUI.GetContext()
 
-	return not isMenu and (context.value == GameUI.Context.QuickHack.value)
+	return not isMenu and not isLoading and not isFastTravel and (context.value == GameUI.Context.QuickHack.value)
 end
 
 function GameUI.IsPopup()
@@ -835,11 +835,12 @@ function GameUI.GetState()
 	currentState.isDevice = GameUI.IsDevice()
 	currentState.isPhoto = GameUI.IsPhoto()
 
-	currentState.isDefault = not currentState.isMenu and not currentState.isScene
-		and not currentState.isBraindance and not currentState.isFastTravel and not currentState.isPhoto
+	currentState.isDefault = not currentState.isDetached and not currentState.isLoading
+		and not currentState.isMenu and not currentState.isScene
+		and not currentState.isBraindance and not currentState.isFastTravel
 		and not currentState.isScanner and not currentState.isQuickHack
 		and not currentState.isPopup and not currentState.isWheel
-		and not currentState.isDevice
+		and not currentState.isDevice and not currentState.isPhoto
 
 	currentState.menu = GameUI.GetMenu()
 	currentState.submenu = GameUI.GetSubmenu()
