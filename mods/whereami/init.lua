@@ -1,4 +1,4 @@
-local GameUI = require('GameUI') -- https://github.com/psiberx/cp2077-cet-kit/blob/main/GameUI.lua
+local GameUI = require('GameUI')
 
 local WhereAmI = {
 	visible = false,

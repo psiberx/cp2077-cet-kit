@@ -405,7 +405,6 @@ local function initialize(event)
 	-- Game Session Listeners
 
 	if required[GameUI.Event.Session] and not initialized[GameUI.Event.Session] then
-		
 		Observe('RadialWheelController', 'RegisterBlackboards', function(_, loaded)
 			--spdlog.error(('RadialWheelController::RegisterBlackboards(%s)'):format(tostring(loaded)))
 
@@ -487,6 +486,12 @@ local function initialize(event)
 		local menuItemListeners = {
 			['MenuScenario_SingleplayerMenu'] = {
 				['OnLoadGame'] = 'LoadGame',
+				['OnMainMenuBack'] = false,
+			},
+			['MenuScenario_Settings'] = {
+				['OnSwitchToBrightnessSettings'] = 'Brightness',
+				['OnSwitchToHDRSettings'] = 'HDR',
+				['OnSettingsBack'] = 'Settings',
 			},
 			['MenuScenario_PauseMenu'] = {
 				['OnSwitchToBrightnessSettings'] = 'Brightness',
@@ -549,6 +554,10 @@ local function initialize(event)
 			updateBraindance(false)
 			updatePhotoMode(false)
 			updateSceneTier(4)
+
+			if not isLoading then
+				notifyObservers()
+			end
 		end)
 
 		initialized[GameUI.Event.Menu] = true
@@ -720,20 +729,40 @@ local function initialize(event)
 end
 
 function GameUI.Observe(event, callback)
-	if type(event) == 'function' then
-		callback = event
-		event = GameUI.Event.Update
-	elseif type(callback) ~= 'function' then
+	if type(event) == 'string' then
+		initialize(event)
+	elseif type(event) == 'function' then
+		callback, event = event, GameUI.Event.Update
+		initialize(event)
+	else
+		if type(event) == 'table' then
+			for _, evt in ipairs(event) do
+				GameUI.Observe(evt, callback)
+			end
+		end
 		return
 	end
 
-	if not listeners[event] then
-		listeners[event] = {}
+	if type(callback) == 'function' then
+		if not listeners[event] then
+			listeners[event] = {}
+		end
+
+		table.insert(listeners[event], callback)
 	end
+end
 
-	table.insert(listeners[event], callback)
-
-	initialize(event)
+function GameUI.Listen(event, callback)
+	if type(event) == 'function' then
+		callback = event
+		for _, evt in pairs(GameUI.Event) do
+			if not GameUI.StateEvent[evt] then
+				GameUI.Observe(evt, callback)
+			end
+		end
+	else
+		GameUI.Observe(event, callback)
+	end
 end
 
 function GameUI.IsDetached()
@@ -802,6 +831,12 @@ function GameUI.IsPhoto()
 	return isPhotoMode
 end
 
+function GameUI.IsDefault()
+	return not isDetached and not isLoading and not isMenu and not isPhotoMode
+		and not isBraindance and not isFastTravel and not GameUI.IsScene()
+		and GameUI.IsContext(GameUI.Context.Default)
+end
+
 function GameUI.GetMenu()
 	return currentMenu
 end
@@ -816,6 +851,10 @@ end
 
 function GameUI.GetContext()
 	return #contextStack > 0 and contextStack[#contextStack] or GameUI.Context.Default
+end
+
+function GameUI.IsContext(context)
+	return GameUI.GetContext().value == (type(context) == 'userdata' and context.value or context)
 end
 
 function GameUI.GetState()
@@ -907,8 +946,7 @@ function GameUI.PrintState(state)
 	print('[UI State] ' .. GameUI.ExportState(state))
 end
 
-GameUI.On = GameUI.Observe
-GameUI.Listen = GameUI.Observe
+GameUI.On = GameUI.Listen
 
 --for event, _ in pairs(GameUI.Event) do
 --	GameUI['On' .. event] = function(callback)
@@ -921,9 +959,11 @@ setmetatable(GameUI, {
 		local event = string.match(key, '^On(%w+)$')
 
 		if event and GameUI.Event[event] then
-			return function(callback)
+			rawset(GameUI, key, function(callback)
 				GameUI.Observe(event, callback)
-			end
+			end)
+
+			return rawget(GameUI, key)
 		end
 	end
 })
