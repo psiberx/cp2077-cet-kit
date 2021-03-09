@@ -1,3 +1,10 @@
+--[[
+Cron.lua
+Timed Tasks Manager
+
+Copyright (c) 2021 psiberx
+]]
+
 local Cron = {}
 
 local timers = { version = '1.0.1' }

@@ -1,21 +1,22 @@
 --[[
-GameUI State Observer
+CronUI.lua
+Reactive Game UI State Observer
+
+Copyright (c) 2021 psiberx
 
 How to use:
 ```
 local GameUI = require('GameUI')
 
 registerForEvent('onInit', function()
-	GameUI.Observe(function(state)
+	GameUI.Listen(function(state)
 		GameUI.PrintState(state)
 	end)
 end)
 ```
-
-See `GameUI.PrintState()` for all state properties
 ]]
 
-local GameUI = { version = '0.9.5' }
+local GameUI = { version = '0.9.6' }
 
 GameUI.Event = {
 	Braindance = 'Braindance',
