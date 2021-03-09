@@ -102,6 +102,19 @@ registerForEvent('onInit', function()
 end)
 ```
 
+### Track UI Events
+
+```lua
+local GameUI = require('GameUI')
+
+registerForEvent('onInit', function()
+    -- Listen for every UI event
+    GameUI.Listen(function(state)
+        GameUI.PrintState(state)
+    end)
+end)
+```
+
 ### Track Game Session
 
 ```lua
