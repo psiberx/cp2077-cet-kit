@@ -14,7 +14,7 @@ I plan to implement support of cron expressions and tie them to the time system 
 
 ### `GameUI.lua` 
 
-Track Game UI state reactively. Doesn't use recurrent `onUpdate` checks. 
+Track game UI state reactively. Doesn't use recurrent `onUpdate` checks. 
  
 Current detections:
  
@@ -53,6 +53,12 @@ If you don't need UI, this module can be used to efficiently detect
 when a player is loading into the game or exiting the current game session. 
 You can initialize mod state when the actual gameplay starts, 
 and reset mod state and free resources when the game session ends.
+
+### `GameSettings.lua` 
+
+Manage game settings. 
+You can get and set current values, get option lists, 
+and export all settings as a table or to a file.
 
 ## How to use
 
@@ -151,6 +157,80 @@ registerForEvent('onInit', function()
 end)
 ```
 
+### Dump All Game Settings
+
+```lua
+local GameSettings = require('GameSettings')
+
+registerHotkey('ExportSettings', 'Export all settings', function()
+    GameSettings.ExportTo('settings.lua')
+end)
+```
+
+### Switch FOV With Hotkey
+
+```lua
+local GameSettings = require('GameSettings')
+
+registerHotkey('SwitchFOV', 'Switch FOV', function()
+    local fov = GameSettings.Var('/graphics/basic/FieldOfView')
+
+    fov.value = fov.value + fov.step
+
+    if fov.value > fov.max then
+        fov.value = fov.min
+    end
+
+    GameSettings.Set('/graphics/basic/FieldOfView', fov.value)
+
+    print(('Current FOV: %.1f'):format(GameSettings.Get('/graphics/basic/FieldOfView')))
+end)
+```
+
+### Cycle Resolutions With Hotkey
+
+```lua
+local GameSettings = require('GameSettings')
+
+registerHotkey('SwitchResolution', 'Switch resolution', function()
+    -- You can get available options and current selection for lists
+    local options, current = GameSettings.Options('/video/display/Resolution')
+    local next = current + 1
+
+    if next > #options then
+        next = 1
+    end
+
+    GameSettings.Set('/video/display/Resolution', options[next])
+
+    if GameSettings.NeedsConfirmation() then
+        GameSettings.Confirm()
+    end
+
+    print(('Switched resolution from %s to %s'):format(options[current], options[next]))
+end)
+```
+
+### Toggle HUD With Hotkey
+
+```lua
+local GameSettings = require('GameSettings')
+
+registerHotkey('ToggleHUD', 'Toggle HUD', function()
+    GameSettings.Toggle('/interface/hud/action_buttons')
+    GameSettings.Toggle('/interface/hud/activity_log')
+    GameSettings.Toggle('/interface/hud/ammo_counter')
+    GameSettings.Toggle('/interface/hud/chatters')
+    GameSettings.Toggle('/interface/hud/healthbar')
+    GameSettings.Toggle('/interface/hud/input_hints')
+    GameSettings.Toggle('/interface/hud/johnny_hud')
+    GameSettings.Toggle('/interface/hud/minimap')
+    GameSettings.Toggle('/interface/hud/npc_healthbar')
+    GameSettings.Toggle('/interface/hud/quest_tracker')
+    GameSettings.Toggle('/interface/hud/stamina_oxygen')
+end)
+```
+
 ## Examples
 
 - [Minimap HUD extension](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/whereami/init.lua)  
@@ -161,3 +241,4 @@ end)
 - [Create custom map pins](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/mappin-system/init.lua)
 - [Call any vehicle with Vehicle System](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/vehicle-system/init.lua)  
 - [Fix Dead-Eye with TweakDB](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/dead-eye-fix/init.lua)
+- [Manage game settings](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/settings-system/init.lua)
