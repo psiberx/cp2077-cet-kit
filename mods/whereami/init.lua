@@ -37,8 +37,12 @@ function WhereAmI.Update()
 	end
 end
 
+function WhereAmI.IsMiniMapEnabled()
+	return Game.GetSettingsSystem():GetVar('/interface/hud', 'minimap'):GetValue()
+end
+
 function WhereAmI.Toggle(visible)
-	WhereAmI.visible = visible
+	WhereAmI.visible = visible and WhereAmI.IsMiniMapEnabled()
 end
 
 registerForEvent('onInit', function()
