@@ -16,9 +16,9 @@ end)
 ```
 ]]
 
-local GameUI = { version = '0.9.7' }
+local GameUI = { version = '0.9.8' }
 
-function nop() end
+function restoreEnvironment() end
 
 GameUI.Event = {
 	Braindance = 'Braindance',
@@ -463,27 +463,23 @@ local function initialize(event)
 	-- Menu State Listeners
 
 	if required[GameUI.Event.Menu] and not initialized[GameUI.Event.Menu] then
-		Observe('inkMenuScenario', 'SwitchToScenario', function(_, menuName)
-			--spdlog.error(('inkMenuScenario::SwitchToScenario(%q)'):format(Game.NameToString(menuName)))
-			nop() -- env fix
+		for menuScenario, _ in pairs(menuScenarios) do
+			Observe(menuScenario, 'OnEnterScenario', function()
+				--spdlog.error(('%s::OnEnterScenario()'):format(menuScenario))
 
-			updateMenuScenario(Game.NameToString(menuName))
-			notifyObservers()
-		end)
+				updateMenuScenario(menuScenario)
 
-		--Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(menuItemData)
-		--	--spdlog.error(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
-		--	nop() -- env fix
-		--
-		--	updateMenuItem(toStudlyCase(menuItemData.menuData.label))
-		--	notifyObservers()
-		--end)
+				if not isLoading then
+					notifyObservers()
+				end
+			end)
+		end
 
-		Observe('MenuHubGameController', 'OnOpenMenuRequest', function(request)
+		Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(menuItemData)
 			--spdlog.error(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
-			nop() -- env fix
+			restoreEnvironment()
 
-			updateMenuItem(toStudlyCase(request.eventData.label))
+			updateMenuItem(toStudlyCase(menuItemData.menuData.label))
 			notifyObservers()
 		end)
 
