@@ -154,7 +154,6 @@ local menuScenarios = {
 	['MenuScenario_NewGame'] = { menu = 'NewGame', submenu = false },
 	['MenuScenario_PauseMenu'] = { menu = 'PauseMenu', submenu = false },
 	['MenuScenario_PlayRecordedSession'] = { menu = 'PlayRecordedSession', submenu = false },
-	['MenuScenario_PreGameSubMenu'] = { menu = 'PreGameSubMenu', submenu = false },
 	['MenuScenario_Settings'] = { menu = 'MainMenu', submenu = 'Settings' },
 	['MenuScenario_SingleplayerMenu'] = { menu = 'MainMenu', submenu = false },
 	['MenuScenario_StatsAdjustment'] = { menu = 'NewGame', submenu = 'Attributes' },
@@ -463,11 +462,30 @@ local function initialize(event)
 	-- Menu State Listeners
 
 	if required[GameUI.Event.Menu] and not initialized[GameUI.Event.Menu] then
-		for menuScenario, _ in pairs(menuScenarios) do
-			Observe(menuScenario, 'OnEnterScenario', function()
-				--spdlog.error(('%s::OnEnterScenario()'):format(menuScenario))
+		--Observe('inkMenuScenario', 'SwitchToScenario', function(_, menuName)
+		--	--spdlog.error(('inkMenuScenario::SwitchToScenario(%q)'):format(Game.NameToString(menuName)))
+		--	restoreEnvironment() -- env fix
+		--
+		--	updateMenuScenario(Game.NameToString(menuName))
+		--	notifyObservers()
+		--end)
 
-				updateMenuScenario(menuScenario)
+		local menuOpenListeners = {
+			'MenuScenario_Idle',
+			'MenuScenario_BaseMenu',
+			'MenuScenario_PreGameSubMenu',
+			'MenuScenario_SingleplayerMenu',
+		}
+
+		for _, menuScenario  in pairs(menuOpenListeners) do
+			Observe(menuScenario, 'OnLeaveScenario', function(self, menuName)
+				--spdlog.error(('%s::OnLeaveScenario()'):format(menuScenario))
+
+				if type(menuName) ~= 'userdata' then
+					menuName = self
+				end
+
+				updateMenuScenario(Game.NameToString(menuName))
 
 				if not isLoading then
 					notifyObservers()
@@ -496,6 +514,7 @@ local function initialize(event)
 				['OnMainMenuBack'] = false,
 			},
 			['MenuScenario_Settings'] = {
+				['OnSwitchToControllerPanel'] = 'Controller',
 				['OnSwitchToBrightnessSettings'] = 'Brightness',
 				['OnSwitchToHDRSettings'] = 'HDR',
 				['OnSettingsBack'] = 'Settings',
@@ -746,6 +765,8 @@ function GameUI.Observe(event, callback)
 			for _, evt in ipairs(event) do
 				GameUI.Observe(evt, callback)
 			end
+		elseif not event then
+			initialize(GameUI.Event.Update)
 		end
 		return
 	end
