@@ -16,9 +16,9 @@ end)
 ```
 ]]
 
-local GameUI = { version = '0.9.7' }
+local GameUI = { version = '1.0.0' }
 
-function nop() end
+function restoreEnvironment() end
 
 GameUI.Event = {
 	Braindance = 'Braindance',
@@ -154,7 +154,6 @@ local menuScenarios = {
 	['MenuScenario_NewGame'] = { menu = 'NewGame', submenu = false },
 	['MenuScenario_PauseMenu'] = { menu = 'PauseMenu', submenu = false },
 	['MenuScenario_PlayRecordedSession'] = { menu = 'PlayRecordedSession', submenu = false },
-	['MenuScenario_PreGameSubMenu'] = { menu = 'PreGameSubMenu', submenu = false },
 	['MenuScenario_Settings'] = { menu = 'MainMenu', submenu = 'Settings' },
 	['MenuScenario_SingleplayerMenu'] = { menu = 'MainMenu', submenu = false },
 	['MenuScenario_StatsAdjustment'] = { menu = 'NewGame', submenu = 'Attributes' },
@@ -463,27 +462,34 @@ local function initialize(event)
 	-- Menu State Listeners
 
 	if required[GameUI.Event.Menu] and not initialized[GameUI.Event.Menu] then
-		Observe('inkMenuScenario', 'SwitchToScenario', function(_, menuName)
-			--spdlog.error(('inkMenuScenario::SwitchToScenario(%q)'):format(Game.NameToString(menuName)))
-			nop() -- env fix
+		local menuOpenListeners = {
+			'MenuScenario_Idle',
+			'MenuScenario_BaseMenu',
+			'MenuScenario_PreGameSubMenu',
+			'MenuScenario_SingleplayerMenu',
+		}
 
-			updateMenuScenario(Game.NameToString(menuName))
-			notifyObservers()
-		end)
+		for _, menuScenario  in pairs(menuOpenListeners) do
+			Observe(menuScenario, 'OnLeaveScenario', function(self, menuName)
+				--spdlog.error(('%s::OnLeaveScenario()'):format(menuScenario))
 
-		--Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(menuItemData)
-		--	--spdlog.error(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
-		--	nop() -- env fix
-		--
-		--	updateMenuItem(toStudlyCase(menuItemData.menuData.label))
-		--	notifyObservers()
-		--end)
+				if type(menuName) ~= 'userdata' then
+					menuName = self
+				end
 
-		Observe('MenuHubGameController', 'OnOpenMenuRequest', function(request)
+				updateMenuScenario(Game.NameToString(menuName))
+
+				if not isLoading then
+					notifyObservers()
+				end
+			end)
+		end
+
+		Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(menuItemData)
 			--spdlog.error(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
-			nop() -- env fix
+			restoreEnvironment()
 
-			updateMenuItem(toStudlyCase(request.eventData.label))
+			updateMenuItem(toStudlyCase(menuItemData.menuData.label))
 			notifyObservers()
 		end)
 
@@ -500,6 +506,7 @@ local function initialize(event)
 				['OnMainMenuBack'] = false,
 			},
 			['MenuScenario_Settings'] = {
+				['OnSwitchToControllerPanel'] = 'Controller',
 				['OnSwitchToBrightnessSettings'] = 'Brightness',
 				['OnSwitchToHDRSettings'] = 'HDR',
 				['OnSettingsBack'] = 'Settings',
@@ -746,7 +753,9 @@ function GameUI.Observe(event, callback)
 		callback, event = event, GameUI.Event.Update
 		initialize(event)
 	else
-		if type(event) == 'table' then
+		if not event then
+			initialize(GameUI.Event.Update)
+		elseif type(event) == 'table' then
 			for _, evt in ipairs(event) do
 				GameUI.Observe(evt, callback)
 			end

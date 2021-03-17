@@ -16,7 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '0.9.8' }
+local GameUI = { version = '1.0.0' }
 
 function restoreEnvironment() end
 
@@ -462,14 +462,6 @@ local function initialize(event)
 	-- Menu State Listeners
 
 	if required[GameUI.Event.Menu] and not initialized[GameUI.Event.Menu] then
-		--Observe('inkMenuScenario', 'SwitchToScenario', function(_, menuName)
-		--	--spdlog.error(('inkMenuScenario::SwitchToScenario(%q)'):format(Game.NameToString(menuName)))
-		--	restoreEnvironment() -- env fix
-		--
-		--	updateMenuScenario(Game.NameToString(menuName))
-		--	notifyObservers()
-		--end)
-
 		local menuOpenListeners = {
 			'MenuScenario_Idle',
 			'MenuScenario_BaseMenu',
@@ -761,12 +753,12 @@ function GameUI.Observe(event, callback)
 		callback, event = event, GameUI.Event.Update
 		initialize(event)
 	else
-		if type(event) == 'table' then
+		if not event then
+			initialize(GameUI.Event.Update)
+		elseif type(event) == 'table' then
 			for _, evt in ipairs(event) do
 				GameUI.Observe(evt, callback)
 			end
-		elseif not event then
-			initialize(GameUI.Event.Update)
 		end
 		return
 	end
