@@ -1,11 +1,12 @@
 --[[
 GameSession.lua
-Reactive Session State Observer
+Reactive Session Observer
+Persistent Session Manager
 
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '0.9.0' }
+local GameSession = { version = '1.0.0' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -17,8 +18,9 @@ GameSession.Event = {
 	Update = 'Update',
 	Load = 'Load',
 	Save = 'Save',
-	LoadState = 'LoadState',
-	SaveState = 'SaveState',
+	List = 'List',
+	LoadData = 'LoadData',
+	SaveData = 'SaveData',
 }
 
 GameSession.Scope = {
@@ -27,6 +29,7 @@ GameSession.Scope = {
 	Blur = 'Blur',
 	Death = 'Death',
 	Saves = 'Saves',
+	Persistence = 'Persistence',
 }
 
 local initialized = {}
@@ -44,14 +47,16 @@ local stateProps = {
 	{ current = 'isBlurred', previous = 'wasBlurred', event = { on = GameSession.Event.Blur, off = GameSession.Event.Resume, scope = GameSession.Scope.Blur } },
 	{ current = 'isDead', previous = 'wasWheel', event = { on = GameSession.Event.Death, scope = GameSession.Scope.Death } },
 	{ current = 'timestamp' },
+	{ current = 'timestamps' },
 }
 
 local eventScopes = {
 	[GameSession.Event.Update] = {},
 	[GameSession.Event.Load] = { [GameSession.Scope.Saves] = true },
 	[GameSession.Event.Save] = { [GameSession.Scope.Saves] = true },
-	[GameSession.Event.LoadState] = { [GameSession.Scope.Saves] = true },
-	[GameSession.Event.SaveState] = { [GameSession.Scope.Saves] = true },
+	[GameSession.Event.List] = { [GameSession.Scope.Saves] = true },
+	[GameSession.Event.LoadData] = { [GameSession.Scope.Persistence] = true },
+	[GameSession.Event.SaveData] = { [GameSession.Scope.Persistence] = true },
 }
 
 local function updateLoaded(loaded)
@@ -296,25 +301,30 @@ local function initialize(event)
 	-- Saving and Loading Listeners
 
 	if required[GameSession.Scope.Saves] and not initialized[GameSession.Scope.Saves] then
-		local saves
+		local saveList
 
 		Observe('LoadGameMenuGameController', 'OnSavesReady', function()
-			saves = {}
+			saveList = {}
 		end)
 
 		Observe('LoadGameMenuGameController', 'OnSaveMetadataReady', function(saveInfo)
-			saves[saveInfo.saveIndex] = saveInfo
+			saveList[saveInfo.saveIndex] = saveInfo
 		end)
 
 		Observe('LoadGameMenuGameController', 'LoadSaveInGame', function(_, saveIndex)
-			local timestamp = saves[saveIndex].timestamp
+			local timestamp = saveList[saveIndex].timestamp
 
 			dispatchEvent(GameSession.Event.Load, { timestamp = timestamp })
 
-			-- todo: manage state
-			-- todo: clean up outdated states
+			local timestamps = {}
 
-			saves = nil
+			for _, saveInfo in pairs(saveList) do
+				table.insert(timestamps, saveInfo.timestamp)
+			end
+
+			dispatchEvent(GameSession.Event.List, { timestamps = timestamps })
+
+			saveList = nil
 		end)
 
 		Observe('gameuiInGameMenuGameController', 'OnSavingComplete', function(success)
@@ -322,8 +332,6 @@ local function initialize(event)
 				local timestamp = os.time()
 
 				dispatchEvent(GameSession.Event.Save, { timestamp = timestamp })
-
-				-- todo: manage state
 			end
 		end)
 
@@ -370,7 +378,7 @@ function GameSession.Listen(event, callback)
 	if type(event) == 'function' then
 		callback = event
 		for _, evt in pairs(GameSession.Event) do
-			if evt ~= GameSession.Event.Update then
+			if evt ~= GameSession.Event.Update and not eventScopes[evt][GameSession.Scope.Persistence] then
 				GameSession.Observe(evt, callback)
 			end
 		end
@@ -412,6 +420,20 @@ function GameSession.GetState()
 	return currentState
 end
 
+local function exportValue(value)
+	if type(value) == 'userdata' then
+		value = string.format('%q', value.value)
+	elseif type(value) == 'string' then
+		value = string.format('%q', value)
+	elseif type(value) == 'table' then
+		value = '{ ' .. table.concat(value, ', ') .. ' }'
+	else
+		value = tostring(value)
+	end
+
+	return value
+end
+
 function GameSession.ExportState(state)
 	local export = {}
 
@@ -423,15 +445,7 @@ function GameSession.ExportState(state)
 		local value = state[stateProp.current]
 
 		if value and (not stateProp.parent or state[stateProp.parent]) then
-			if type(value) == 'userdata' then
-				value = string.format('%q', value.value)
-			elseif type(value) == 'string' then
-				value = string.format('%q', value)
-			else
-				value = tostring(value)
-			end
-
-			table.insert(export, stateProp.current .. ' = ' .. value)
+			table.insert(export, stateProp.current .. ' = ' .. exportValue(value))
 		end
 	end
 
@@ -441,15 +455,7 @@ function GameSession.ExportState(state)
 			local previousValue = state[stateProp.previous]
 
 			if previousValue and previousValue ~= currentValue then
-				if type(previousValue) == 'userdata' then
-					previousValue = string.format('%q', previousValue.value)
-				elseif type(previousValue) == 'string' then
-					previousValue = string.format('%q', previousValue)
-				else
-					previousValue = tostring(previousValue)
-				end
-
-				table.insert(export, stateProp.previous .. ' = ' .. previousValue)
+				table.insert(export, stateProp.previous .. ' = ' .. exportValue(previousValue))
 			end
 		end
 	end
@@ -476,5 +482,140 @@ setmetatable(GameSession, {
 		end
 	end
 })
+
+-- Persistent Session
+
+local sessionDataDir = ''
+local sessionDataRef
+
+local function exportSession(t, max, depth)
+	if type(t) ~= 'table' then
+		return ''
+	end
+
+	max = max or 63
+	depth = depth or 0
+
+	local dumpStr = '{\n'
+	local indent = string.rep('\t', depth)
+
+	for k, v in pairs(t) do
+		local kstr = ''
+		if type(k) == 'string' then
+			kstr = string.format('[\'%s\'] = ', k)
+		end
+
+		local vstr = tostring(v)
+		if type(v) == 'string' then
+			vstr = string.format('\'%s\'', tostring(v))
+		elseif type(v) == 'table' then
+			if depth < max then
+				vstr = exportSession(v, max, depth + 1)
+			else
+				vstr = '...'
+			end
+		end
+
+		dumpStr = string.format('%s\t%s%s%s,\n', dumpStr, indent, kstr, vstr)
+	end
+
+	return string.format('%s%s}', dumpStr, indent)
+end
+
+local function writeSession(sessionName, sessionData)
+	local sessionPath = sessionDataDir .. '/' .. sessionName .. '.lua'
+	local sessionFile = io.open(sessionPath, 'w')
+
+	if not sessionFile then
+		error(('GameSession.Persist(): Cannot write session file %q.'):format(sessionPath))
+	end
+
+	sessionFile:write('return ')
+	sessionFile:write(exportSession(sessionData))
+	sessionFile:close()
+end
+
+local function readSession(sessionName)
+	local sessionPath = sessionDataDir .. '/' .. sessionName .. '.lua'
+	local sessionChunk = loadfile(sessionPath)
+
+	if type(sessionChunk) ~= 'function' then
+		error(('GameSession.Persist(): Cannot read session file %q.'):format(sessionPath))
+	end
+
+	return sessionChunk()
+end
+
+local function removeSession(sessionName)
+	local sessionPath = sessionDataDir .. '/' .. sessionName .. '.lua'
+
+	os.remove(sessionPath)
+end
+
+local function cleanUpSessions(sessionNames)
+	local validNames = {}
+
+	for _, sessionName in ipairs(sessionNames) do
+		validNames[tostring(sessionName)] = true
+		validNames[tostring(sessionName + 1)] = true
+	end
+
+	for _, sessionFile in pairs(dir(sessionDataDir)) do
+		local sessionName = sessionFile.name:gsub('%.lua$', '')
+
+		if not validNames[sessionName] then
+			removeSession(sessionName)
+		end
+	end
+end
+
+local function setupPersistance()
+	if not initialized[GameSession.Scope.Persistence] then
+
+		GameSession.Observe(GameSession.Event.Save, function(state)
+			local sessionName = state.timestamp
+			local sessionData = sessionDataRef or {}
+
+			dispatchEvent(GameSession.Event.SaveData, sessionData)
+
+			writeSession(sessionName, sessionData)
+		end)
+
+		GameSession.Observe(GameSession.Event.Load, function(state)
+			local sessionName = state.timestamp
+			local sessionData = readSession(sessionName)
+
+			dispatchEvent(GameSession.Event.LoadData, sessionData)
+
+			if sessionDataRef then
+				for prop, value in pairs(sessionData) do
+					sessionDataRef[prop] = value
+				end
+			end
+		end)
+
+		GameSession.Observe(GameSession.Event.List, function(state)
+			cleanUpSessions(state.timestamps)
+		end)
+
+		initialized[GameSession.Scope.Persistence] = true
+	end
+end
+
+function GameSession.StoreInDir(sessionDir)
+	sessionDataDir = sessionDir
+
+	setupPersistance()
+end
+
+function GameSession.Persist(sessionData)
+	if type(sessionData) ~= 'table' then
+		error(('GameSession.Persist(): Session data must be a table, received %q.'):format(type(table)))
+	end
+
+	sessionDataRef = sessionData
+
+	setupPersistance()
+end
 
 return GameSession
