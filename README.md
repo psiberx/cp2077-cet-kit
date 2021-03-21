@@ -201,7 +201,7 @@ registerForEvent('onInit', function()
 end)
 
 registerForEvent('onOverlayOpen', function()
-    userState.consoleUses = userState.consoleUses + 1
+    userState.consoleUses = userState.consoleUses + 1 -- Increase the number of console uses
 end)
 ```
 
