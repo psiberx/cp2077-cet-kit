@@ -56,7 +56,7 @@ and reset mod state and free resources when the game session ends.
 
 ### `GameSession.lua` 
 
-Track game session reactively and store data linked to particular save file. 
+Track game session reactively and store data linked to a game save. 
  
 Current detections:
  
