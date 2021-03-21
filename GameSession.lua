@@ -286,6 +286,13 @@ local function initialize(event)
 		initialized[GameSession.Scope.Blur] = true
 	end
 
+	-- Death State Listeners
+
+	Observe('PlayerPuppet', 'OnDeath', function()
+		updateDead(true)
+		notifyObservers()
+	end)
+
 	-- Saving and Loading Listeners
 
 	if required[GameSession.Scope.Saves] and not initialized[GameSession.Scope.Saves] then
