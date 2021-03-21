@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.0' }
+local GameSession = { version = '1.0.1' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -487,6 +487,7 @@ setmetatable(GameSession, {
 
 local sessionDataDir = ''
 local sessionDataRef
+local sessionDataTmpl
 
 local function exportSession(t, max, depth)
 	if type(t) ~= 'table' then
@@ -522,6 +523,12 @@ local function exportSession(t, max, depth)
 	return string.format('%s%s}', dumpStr, indent)
 end
 
+local function importSession(s)
+	local chunk = loadstring('return ' .. s, '')
+
+	return chunk and chunk() or {}
+end
+
 local function writeSession(sessionName, sessionData)
 	local sessionPath = sessionDataDir .. '/' .. sessionName .. '.lua'
 	local sessionFile = io.open(sessionPath, 'w')
@@ -540,7 +547,8 @@ local function readSession(sessionName)
 	local sessionChunk = loadfile(sessionPath)
 
 	if type(sessionChunk) ~= 'function' then
-		error(('GameSession.Persist(): Cannot read session file %q.'):format(sessionPath))
+		return nil
+		--error(('GameSession.Persist(): Cannot read session file %q.'):format(sessionPath))
 	end
 
 	return sessionChunk()
@@ -587,6 +595,14 @@ local function setupPersistance()
 			local sessionName = state.timestamp
 			local sessionData = readSession(sessionName)
 
+			if not sessionData then
+				if sessionDataTmpl then
+					sessionData = importSession(sessionDataTmpl)
+				else
+					sessionData = {}
+				end
+			end
+
 			dispatchEvent(GameSession.Event.LoadData, sessionData)
 
 			if sessionDataRef then
@@ -616,6 +632,7 @@ function GameSession.Persist(sessionData)
 	end
 
 	sessionDataRef = sessionData
+	sessionDataTmpl = exportSession(sessionData)
 
 	setupPersistance()
 end
