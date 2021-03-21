@@ -54,6 +54,22 @@ when a player is loading into the game or exiting the current game session.
 You can initialize mod state when the actual gameplay starts, 
 and reset mod state and free resources when the game session ends.
 
+### `GameSession.lua` 
+
+Track game session reactively and store data linked to particular save file. 
+ 
+Current detections:
+ 
+- Session Start (New Game, Load Game)
+- Session End (Load Game, Exit to Main Menu)
+- Saving and Loading (Manual Save, Quick Save, Auto Save)
+- Pause State (All Menus)
+- Blur State (Weapon Wheel, Phone, Call Vehicle)
+- Death State
+
+Data persistence particularly useful for gameplay mods. 
+You can store and manage data linked to a save file.
+
 ### `GameSettings.lua` 
 
 Manage game settings. 
@@ -121,26 +137,6 @@ registerForEvent('onInit', function()
 end)
 ```
 
-### Track Game Session
-
-```lua
-local GameUI = require('GameUI')
-
-registerForEvent('onInit', function()
-    GameUI.OnSessionStart(function()
-        -- Triggered once the load is complete and the player is in the game
-        -- (after the loading screen for "Load Game" or "New Game")
-        print('Game Session Started')
-    end)
-
-    GameUI.OnSessionEnd(function()
-        -- Triggered once the current game session has ended
-        -- (when "Load Game" or "Exit to Main Menu" selected)
-        print('Game Session Ended')
-    end)
-end)
-```
-
 ### Track Fast Traveling
 
 ```lua
@@ -154,6 +150,58 @@ registerForEvent('onInit', function()
     GameUI.OnFastTravelFinish(function()
         print('Fast Travel Finished')
     end)
+end)
+```
+
+### Track Session Events
+
+```lua
+local GameSession = require('GameSession')
+
+registerForEvent('onInit', function()
+    -- Listen for every session event
+    GameSession.Listen(function(state)
+        GameSession.PrintState(state)
+    end)
+end)
+```
+
+### Track Session Lifecycle
+
+```lua
+local GameSession = require('GameSession')
+
+registerForEvent('onInit', function()
+    GameSession.OnStart(function()
+        -- Triggered once the load is complete and the player is in the game
+        -- (after the loading screen for "Load Game" or "New Game")
+        print('Game Session Started')
+    end)
+
+    GameSession.OnEnd(function()
+        -- Triggered once the current game session has ended
+        -- (when "Load Game" or "Exit to Main Menu" selected)
+        print('Game Session Ended')
+    end)
+end)
+```
+
+### Persist Session Data
+
+```lua
+local GameSession = require('GameSession')
+
+local userState = { 
+    consoleUses = 0 -- Initial state
+}
+
+registerForEvent('onInit', function()
+    GameSession.StoreInDir('sessions') -- Set directory to store session data
+    GameSession.Persist(userState) -- Link the data that should be watched and persisted 
+end)
+
+registerForEvent('onOverlayOpen', function()
+    userState.consoleUses = userState.consoleUses + 1
 end)
 ```
 
@@ -233,10 +281,12 @@ end)
 
 ## Examples
 
-- [Minimap HUD extension](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/whereami/init.lua)  
+- [Minimap HUD extension](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/GameUI-WhereAmI/init.lua)  
   Uses `GameUI` to determine when to show or hide the widget.  
   The widget is visible only on the default in-game HUD.  
   ![WhereAmI](https://siberx.dev/cp2077-cet-demos/whereami-210223.jpg)
+- [Kill stats](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/GameSession-KillStats/init.lua)  
+  Uses `GameSession` to store kill stats for each save file.  
 - [Read player actions / inputs](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/player-actions/init.lua)
 - [Create custom map pins](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/mappin-system/init.lua)
 - [Call any vehicle with Vehicle System](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/vehicle-system/init.lua)  
