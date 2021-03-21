@@ -561,10 +561,12 @@ local function cleanUpSessions(sessionNames)
 	end
 
 	for _, sessionFile in pairs(dir(sessionDataDir)) do
-		local sessionName = sessionFile.name:gsub('%.lua$', '')
+		if not sessionFile.name:find('^%.') then
+			local sessionName = sessionFile.name:gsub('%.lua$', '')
 
-		if not validNames[sessionName] then
-			removeSession(sessionName)
+			if not validNames[sessionName] then
+				removeSession(sessionName)
+			end
 		end
 	end
 end
