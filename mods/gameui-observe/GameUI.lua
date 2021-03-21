@@ -963,7 +963,7 @@ function GameUI.ExportState(state)
 end
 
 function GameUI.PrintState(state)
-	print('[UI State] ' .. GameUI.ExportState(state))
+	print('[GameUI] ' .. GameUI.ExportState(state))
 end
 
 GameUI.On = GameUI.Listen
