@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.2' }
+local GameSession = { version = '1.0.3' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -34,7 +34,42 @@ GameSession.Scope = {
 
 local initialized = {}
 local listeners = {}
-local previousState = {}
+
+local eventScopes = {
+	[GameSession.Event.Update] = {},
+	[GameSession.Event.Load] = { [GameSession.Scope.Saves] = true },
+	[GameSession.Event.Save] = { [GameSession.Scope.Saves] = true },
+	[GameSession.Event.List] = { [GameSession.Scope.Saves] = true },
+	[GameSession.Event.LoadData] = { [GameSession.Scope.Saves] = true, [GameSession.Scope.Persistence] = true },
+	[GameSession.Event.SaveData] = { [GameSession.Scope.Saves] = true, [GameSession.Scope.Persistence] = true },
+}
+
+local function addEventListener(event, callback)
+	if not listeners[event] then
+		listeners[event] = {}
+	end
+
+	table.insert(listeners[event], callback)
+end
+
+local function dispatchEvent(event, state)
+	if listeners[event] then
+		state.event = event
+
+		for _, callback in ipairs(listeners[event]) do
+			callback(state)
+		end
+
+		state.event = nil
+	end
+end
+
+local function raiseError(msg)
+	print('[GameSession] ' .. msg)
+	error(msg, 2)
+end
+
+-- State Observing
 
 local isLoaded = false
 local isPaused = true
@@ -50,19 +85,7 @@ local stateProps = {
 	{ current = 'timestamps' },
 }
 
-local eventScopes = {
-	[GameSession.Event.Update] = {},
-	[GameSession.Event.Load] = { [GameSession.Scope.Saves] = true },
-	[GameSession.Event.Save] = { [GameSession.Scope.Saves] = true },
-	[GameSession.Event.List] = { [GameSession.Scope.Saves] = true },
-	[GameSession.Event.LoadData] = { [GameSession.Scope.Persistence] = true },
-	[GameSession.Event.SaveData] = { [GameSession.Scope.Persistence] = true },
-}
-
-local function raiseError(msg)
-	print('[GameSession] ' .. msg)
-	error(msg, 2)
-end
+local previousState = {}
 
 local function updateLoaded(loaded)
 	isLoaded = loaded
@@ -177,320 +200,13 @@ local function notifyObservers()
 	end
 end
 
-local function dispatchEvent(event, state)
-	if listeners[event] then
-		state.event = event
-
-		for _, callback in ipairs(listeners[event]) do
-			callback(state)
-		end
-
-		state.event = nil
-	end
-end
-
 local function pushCurrentState()
 	previousState = GameSession.GetState()
 end
 
-local function initialize(event)
-	if not initialized.data then
-		for _, stateProp in ipairs(stateProps) do
-			if stateProp.event then
-				local eventScope = stateProp.event.scope or stateProp.event.change or stateProp.current
-
-				for _, eventKey in ipairs({ 'change', 'on', 'off' }) do
-					local eventName = stateProp.event[eventKey]
-
-					if eventName then
-						eventScopes[eventName] = {}
-						eventScopes[eventName][eventScope] = true
-					end
-				end
-
-				eventScopes[GameSession.Event.Update][eventScope] = true
-			end
-		end
-
-		initialized.data = true
-	end
-
-	local required = eventScopes[event] or eventScopes[GameSession.Event.Update]
-
-	-- Session State Listeners
-
-	if required[GameSession.Scope.Session] and not initialized[GameSession.Scope.Session] then
-		Observe('RadialWheelController', 'RegisterBlackboards', function(_, loaded)
-			--spdlog.error(('RadialWheelController::RegisterBlackboards(%s)'):format(tostring(loaded)))
-
-			updateLoaded(loaded)
-			updatePaused(false)
-			updateBlurred(false)
-			updateDead(false)
-			notifyObservers()
-		end)
-
-		initialized[GameSession.Scope.Session] = true
-	end
-
-	-- Pause State Listeners
-
-	if required[GameSession.Scope.Pause] and not initialized[GameSession.Scope.Pause] then
-		Observe('RadialWheelController', 'OnIsInMenuChanged', function(isInMenu)
-			--spdlog.error(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(isInMenu)))
-
-			updatePaused(isInMenu)
-			notifyObservers()
-		end)
-
-		initialized[GameSession.Scope.Pause] = true
-	end
-
-	-- Blur State Listeners
-
-	if required[GameSession.Scope.Blur] and not initialized[GameSession.Scope.Blur] then
-		local popupControllers = {
-			['PhoneDialerGameController'] = {
-				['Show'] = true,
-				['Hide'] = false,
-			},
-			['RadialWheelController'] = {
-				['RefreshSlots'] = { initialized = true },
-				['Shutdown'] = false,
-			},
-			['VehicleRadioPopupGameController'] = {
-				['OnInitialize'] = true,
-				['OnClose'] = false,
-			},
-			['VehiclesManagerPopupGameController'] = {
-				['OnInitialize'] = true,
-				['OnClose'] = false,
-			},
-		}
-
-		for popupController, popupEvents in pairs(popupControllers) do
-			for popupEvent, popupState in pairs(popupEvents) do
-				Observe(popupController, popupEvent, function(self)
-					--spdlog.error(('%s::%s()'):format(popupController, popupEvent))
-
-					if isLoaded then
-						if type(popupState) == 'table' then
-							local popupActive = true
-							for prop, value in pairs(popupState) do
-								if self[prop] ~= value then
-									popupActive = false
-									break
-								end
-							end
-							updateBlurred(popupActive)
-						else
-							updateBlurred(popupState)
-						end
-
-						notifyObservers()
-					end
-				end)
-			end
-		end
-
-		initialized[GameSession.Scope.Blur] = true
-	end
-
-	-- Death State Listeners
-
-	Observe('PlayerPuppet', 'OnDeath', function()
-		updateDead(true)
-		notifyObservers()
-	end)
-
-	-- Saving and Loading Listeners
-
-	if required[GameSession.Scope.Saves] and not initialized[GameSession.Scope.Saves] then
-		local saveList
-
-		Observe('LoadGameMenuGameController', 'OnSavesReady', function()
-			saveList = {}
-		end)
-
-		Observe('LoadGameMenuGameController', 'OnSaveMetadataReady', function(saveInfo)
-			saveList[saveInfo.saveIndex] = saveInfo
-		end)
-
-		Observe('LoadGameMenuGameController', 'LoadSaveInGame', function(_, saveIndex)
-			local timestamp = saveList[saveIndex].timestamp
-
-			dispatchEvent(GameSession.Event.Load, { timestamp = timestamp })
-
-			local timestamps = {}
-
-			for _, saveInfo in pairs(saveList) do
-				table.insert(timestamps, saveInfo.timestamp)
-			end
-
-			dispatchEvent(GameSession.Event.List, { timestamps = timestamps })
-
-			saveList = nil
-		end)
-
-		Observe('gameuiInGameMenuGameController', 'OnSavingComplete', function(success)
-			if success then
-				local timestamp = os.time()
-
-				dispatchEvent(GameSession.Event.Save, { timestamp = timestamp })
-			end
-		end)
-
-		initialized[GameSession.Scope.Saves] = true
-	end
-
-	-- Initial state
-
-	if not initialized.state then
-		refreshCurrentState()
-		pushCurrentState()
-
-		initialized.state = true
-	end
-end
-
-function GameSession.Observe(event, callback)
-	if type(event) == 'string' then
-		initialize(event)
-	elseif type(event) == 'function' then
-		callback, event = event, GameSession.Event.Update
-		initialize(event)
-	else
-		if not event then
-			initialize(GameSession.Event.Update)
-		elseif type(event) == 'table' then
-			for _, evt in ipairs(event) do
-				GameSession.Observe(evt, callback)
-			end
-		end
-		return
-	end
-
-	if type(callback) == 'function' then
-		if not listeners[event] then
-			listeners[event] = {}
-		end
-
-		table.insert(listeners[event], callback)
-	end
-end
-
-function GameSession.Listen(event, callback)
-	if type(event) == 'function' then
-		callback = event
-		for _, evt in pairs(GameSession.Event) do
-			if evt ~= GameSession.Event.Update and not eventScopes[evt][GameSession.Scope.Persistence] then
-				GameSession.Observe(evt, callback)
-			end
-		end
-	else
-		GameSession.Observe(event, callback)
-	end
-end
-
-function GameSession.IsLoaded()
-	return isLoaded
-end
-
-function GameSession.IsPaused()
-	return isPaused
-end
-
-function GameSession.IsBlurred()
-	return isBlurred
-end
-
-function GameSession.IsDead()
-	return isDead
-end
-
-function GameSession.GetState()
-	local currentState = {}
-
-	currentState.isLoaded = GameSession.IsLoaded()
-	currentState.isPaused = GameSession.IsPaused()
-	currentState.isBlurred = GameSession.IsBlurred()
-	currentState.isDead = GameSession.IsDead()
-
-	for _, stateProp in ipairs(stateProps) do
-		if stateProp.previous then
-			currentState[stateProp.previous] = previousState[stateProp.current]
-		end
-	end
-
-	return currentState
-end
-
-local function exportValue(value)
-	if type(value) == 'userdata' then
-		value = string.format('%q', value.value)
-	elseif type(value) == 'string' then
-		value = string.format('%q', value)
-	elseif type(value) == 'table' then
-		value = '{ ' .. table.concat(value, ', ') .. ' }'
-	else
-		value = tostring(value)
-	end
-
-	return value
-end
-
-function GameSession.ExportState(state)
-	local export = {}
-
-	if state.event then
-		table.insert(export, 'event = ' .. string.format('%q', state.event))
-	end
-
-	for _, stateProp in ipairs(stateProps) do
-		local value = state[stateProp.current]
-
-		if value and (not stateProp.parent or state[stateProp.parent]) then
-			table.insert(export, stateProp.current .. ' = ' .. exportValue(value))
-		end
-	end
-
-	for _, stateProp in ipairs(stateProps) do
-		if stateProp.previous then
-			local currentValue = state[stateProp.current]
-			local previousValue = state[stateProp.previous]
-
-			if previousValue and previousValue ~= currentValue then
-				table.insert(export, stateProp.previous .. ' = ' .. exportValue(previousValue))
-			end
-		end
-	end
-
-	return '{ ' .. table.concat(export, ', ') .. ' }'
-end
-
-function GameSession.PrintState(state)
-	print('[GameSession] ' .. GameSession.ExportState(state))
-end
-
-GameSession.On = GameSession.Listen
-
-setmetatable(GameSession, {
-	__index = function(_, key)
-		local event = string.match(key, '^On(%w+)$')
-
-		if event and GameSession.Event[event] then
-			rawset(GameSession, key, function(callback)
-				GameSession.Observe(event, callback)
-			end)
-
-			return rawget(GameSession, key)
-		end
-	end
-})
-
 -- Persistent Session
 
-local sessionDataDir = ''
+local sessionDataDir
 local sessionDataRef
 local sessionDataTmpl
 
@@ -602,10 +318,166 @@ local function cleanUpSessions(sessionNames)
 	end
 end
 
-local function setupPersistance()
-	if not initialized[GameSession.Scope.Persistence] then
+-- Initialization
 
-		GameSession.Observe(GameSession.Event.Save, function(state)
+local function initialize(event)
+	if not initialized.data then
+		for _, stateProp in ipairs(stateProps) do
+			if stateProp.event then
+				local eventScope = stateProp.event.scope or stateProp.event.change or stateProp.current
+
+				for _, eventKey in ipairs({ 'change', 'on', 'off' }) do
+					local eventName = stateProp.event[eventKey]
+
+					if eventName then
+						eventScopes[eventName] = {}
+						eventScopes[eventName][eventScope] = true
+					end
+				end
+
+				eventScopes[GameSession.Event.Update][eventScope] = true
+			end
+		end
+
+		initialized.data = true
+	end
+
+	local required = eventScopes[event] or eventScopes[GameSession.Event.Update]
+
+	-- Session State
+
+	if required[GameSession.Scope.Session] and not initialized[GameSession.Scope.Session] then
+		Observe('RadialWheelController', 'RegisterBlackboards', function(_, loaded)
+			--spdlog.error(('RadialWheelController::RegisterBlackboards(%s)'):format(tostring(loaded)))
+
+			updateLoaded(loaded)
+			updatePaused(false)
+			updateBlurred(false)
+			updateDead(false)
+			notifyObservers()
+		end)
+
+		initialized[GameSession.Scope.Session] = true
+	end
+
+	-- Pause State
+
+	if required[GameSession.Scope.Pause] and not initialized[GameSession.Scope.Pause] then
+		Observe('RadialWheelController', 'OnIsInMenuChanged', function(isInMenu)
+			--spdlog.error(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(isInMenu)))
+
+			updatePaused(isInMenu)
+			notifyObservers()
+		end)
+
+		initialized[GameSession.Scope.Pause] = true
+	end
+
+	-- Blur State
+
+	if required[GameSession.Scope.Blur] and not initialized[GameSession.Scope.Blur] then
+		local popupControllers = {
+			['PhoneDialerGameController'] = {
+				['Show'] = true,
+				['Hide'] = false,
+			},
+			['RadialWheelController'] = {
+				['RefreshSlots'] = { initialized = true },
+				['Shutdown'] = false,
+			},
+			['VehicleRadioPopupGameController'] = {
+				['OnInitialize'] = true,
+				['OnClose'] = false,
+			},
+			['VehiclesManagerPopupGameController'] = {
+				['OnInitialize'] = true,
+				['OnClose'] = false,
+			},
+		}
+
+		for popupController, popupEvents in pairs(popupControllers) do
+			for popupEvent, popupState in pairs(popupEvents) do
+				Observe(popupController, popupEvent, function(self)
+					--spdlog.error(('%s::%s()'):format(popupController, popupEvent))
+
+					if isLoaded then
+						if type(popupState) == 'table' then
+							local popupActive = true
+							for prop, value in pairs(popupState) do
+								if self[prop] ~= value then
+									popupActive = false
+									break
+								end
+							end
+							updateBlurred(popupActive)
+						else
+							updateBlurred(popupState)
+						end
+
+						notifyObservers()
+					end
+				end)
+			end
+		end
+
+		initialized[GameSession.Scope.Blur] = true
+	end
+
+	-- Death State
+
+	if required[GameSession.Scope.Death] and not initialized[GameSession.Scope.Death] then
+		Observe('PlayerPuppet', 'OnDeath', function()
+			updateDead(true)
+			notifyObservers()
+		end)
+
+		initialized[GameSession.Scope.Death] = true
+	end
+
+	-- Saving and Loading
+
+	if required[GameSession.Scope.Saves] and not initialized[GameSession.Scope.Saves] then
+		local saveList
+
+		Observe('LoadGameMenuGameController', 'OnSavesReady', function()
+			saveList = {}
+		end)
+
+		Observe('LoadGameMenuGameController', 'OnSaveMetadataReady', function(saveInfo)
+			saveList[saveInfo.saveIndex] = saveInfo
+		end)
+
+		Observe('LoadGameMenuGameController', 'LoadSaveInGame', function(_, saveIndex)
+			local timestamp = saveList[saveIndex].timestamp
+
+			dispatchEvent(GameSession.Event.Load, { timestamp = timestamp })
+
+			local timestamps = {}
+
+			for _, saveInfo in pairs(saveList) do
+				table.insert(timestamps, saveInfo.timestamp)
+			end
+
+			dispatchEvent(GameSession.Event.List, { timestamps = timestamps })
+
+			saveList = nil
+		end)
+
+		Observe('gameuiInGameMenuGameController', 'OnSavingComplete', function(success)
+			if success then
+				local timestamp = os.time()
+
+				dispatchEvent(GameSession.Event.Save, { timestamp = timestamp })
+			end
+		end)
+
+		initialized[GameSession.Scope.Saves] = true
+	end
+
+	-- Persistence
+
+	if not initialized[GameSession.Scope.Persistence] then
+		addEventListener(GameSession.Event.Save, function(state)
 			local sessionName = state.timestamp
 			local sessionData = sessionDataRef or {}
 
@@ -614,7 +486,7 @@ local function setupPersistance()
 			writeSession(sessionName, sessionData)
 		end)
 
-		GameSession.Observe(GameSession.Event.Load, function(state)
+		addEventListener(GameSession.Event.Load, function(state)
 			local sessionName = state.timestamp
 			local sessionData = readSession(sessionName)
 
@@ -635,29 +507,171 @@ local function setupPersistance()
 			end
 		end)
 
-		GameSession.Observe(GameSession.Event.List, function(state)
+		addEventListener(GameSession.Event.List, function(state)
 			cleanUpSessions(state.timestamps)
 		end)
 
 		initialized[GameSession.Scope.Persistence] = true
 	end
+
+	-- Initial state
+
+	if not initialized.state then
+		refreshCurrentState()
+		pushCurrentState()
+
+		initialized.state = true
+	end
+end
+
+-- Public Interface
+
+function GameSession.Observe(event, callback)
+	if type(event) == 'string' then
+		initialize(event)
+	elseif type(event) == 'function' then
+		callback, event = event, GameSession.Event.Update
+		initialize(event)
+	else
+		if not event then
+			initialize(GameSession.Event.Update)
+		elseif type(event) == 'table' then
+			for _, evt in ipairs(event) do
+				GameSession.Observe(evt, callback)
+			end
+		end
+		return
+	end
+
+	if type(callback) == 'function' then
+		addEventListener(event, callback)
+	end
+end
+
+function GameSession.Listen(event, callback)
+	if type(event) == 'function' then
+		callback = event
+		for _, evt in pairs(GameSession.Event) do
+			if evt ~= GameSession.Event.Update and not eventScopes[evt][GameSession.Scope.Persistence] then
+				GameSession.Observe(evt, callback)
+			end
+		end
+	else
+		GameSession.Observe(event, callback)
+	end
+end
+
+GameSession.On = GameSession.Listen
+
+setmetatable(GameSession, {
+	__index = function(_, key)
+		local event = string.match(key, '^On(%w+)$')
+
+		if event and GameSession.Event[event] then
+			rawset(GameSession, key, function(callback)
+				GameSession.Observe(event, callback)
+			end)
+
+			return rawget(GameSession, key)
+		end
+	end
+})
+
+function GameSession.IsLoaded()
+	return isLoaded
+end
+
+function GameSession.IsPaused()
+	return isPaused
+end
+
+function GameSession.IsBlurred()
+	return isBlurred
+end
+
+function GameSession.IsDead()
+	return isDead
+end
+
+function GameSession.GetState()
+	local currentState = {}
+
+	currentState.isLoaded = GameSession.IsLoaded()
+	currentState.isPaused = GameSession.IsPaused()
+	currentState.isBlurred = GameSession.IsBlurred()
+	currentState.isDead = GameSession.IsDead()
+
+	for _, stateProp in ipairs(stateProps) do
+		if stateProp.previous then
+			currentState[stateProp.previous] = previousState[stateProp.current]
+		end
+	end
+
+	return currentState
+end
+
+local function exportValue(value)
+	if type(value) == 'userdata' then
+		value = string.format('%q', value.value)
+	elseif type(value) == 'string' then
+		value = string.format('%q', value)
+	elseif type(value) == 'table' then
+		value = '{ ' .. table.concat(value, ', ') .. ' }'
+	else
+		value = tostring(value)
+	end
+
+	return value
+end
+
+function GameSession.ExportState(state)
+	local export = {}
+
+	if state.event then
+		table.insert(export, 'event = ' .. string.format('%q', state.event))
+	end
+
+	for _, stateProp in ipairs(stateProps) do
+		local value = state[stateProp.current]
+
+		if value and (not stateProp.parent or state[stateProp.parent]) then
+			table.insert(export, stateProp.current .. ' = ' .. exportValue(value))
+		end
+	end
+
+	for _, stateProp in ipairs(stateProps) do
+		if stateProp.previous then
+			local currentValue = state[stateProp.current]
+			local previousValue = state[stateProp.previous]
+
+			if previousValue and previousValue ~= currentValue then
+				table.insert(export, stateProp.previous .. ' = ' .. exportValue(previousValue))
+			end
+		end
+	end
+
+	return '{ ' .. table.concat(export, ', ') .. ' }'
+end
+
+function GameSession.PrintState(state)
+	print('[GameSession] ' .. GameSession.ExportState(state))
 end
 
 function GameSession.StoreInDir(sessionDir)
 	sessionDataDir = sessionDir
 
-	setupPersistance()
+	initialize(GameSession.Event.SaveData)
 end
 
 function GameSession.Persist(sessionData)
 	if type(sessionData) ~= 'table' then
-		raiseError(('Session data must be a table, received %q.'):format(type(table)))
+		raiseError(('Session data must be a table, received %s.'):format(type(sessionData)))
 	end
 
 	sessionDataRef = sessionData
 	sessionDataTmpl = exportSession(sessionData)
 
-	setupPersistance()
+	initialize(GameSession.Event.SaveData)
 end
 
 return GameSession
