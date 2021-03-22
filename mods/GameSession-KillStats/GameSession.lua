@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.1' }
+local GameSession = { version = '1.0.2' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -58,6 +58,11 @@ local eventScopes = {
 	[GameSession.Event.LoadData] = { [GameSession.Scope.Persistence] = true },
 	[GameSession.Event.SaveData] = { [GameSession.Scope.Persistence] = true },
 }
+
+local function raiseError(msg)
+	print('[GameSession] ' .. msg)
+	error(msg, 2)
+end
 
 local function updateLoaded(loaded)
 	isLoaded = loaded
@@ -501,20 +506,39 @@ local function exportSession(t, max, depth)
 	local indent = string.rep('\t', depth)
 
 	for k, v in pairs(t) do
+		local ktype = type(k)
+		local vtype = type(v)
+
 		local kstr = ''
-		if type(k) == 'string' then
-			kstr = string.format('[\'%s\'] = ', k)
+		if ktype == 'string' then
+			kstr = string.format('[%q] = ', k)
 		end
 
-		local vstr = tostring(v)
-		if type(v) == 'string' then
-			vstr = string.format('\'%s\'', tostring(v))
-		elseif type(v) == 'table' then
+		local vstr
+		if vtype == 'string' then
+			vstr = string.format('%q', v)
+		elseif vtype == 'table' then
 			if depth < max then
 				vstr = exportSession(v, max, depth + 1)
-			else
-				vstr = '...'
 			end
+		elseif vtype == 'userdata' then
+			vstr = tostring(v)
+			if vstr:find('^sol%.') then
+				vtype = vstr:match('^sol%.(.+):')
+				if ktype == 'string' then
+					raiseError(('Cannot store userdata of type %q in the %q field.'):format(vtype, k))
+				else
+					raiseError(('Cannot store userdata of type %q.'):format(vtype))
+				end
+			end
+		elseif vtype == 'function' or vtype == 'thread' then
+			if ktype == 'string' then
+				raiseError(('Cannot store %s in the %q field.'):format(vtype, k))
+			else
+				raiseError(('Cannot store %s.'):format(vtype))
+			end
+		else
+			vstr = tostring(v)
 		end
 
 		dumpStr = string.format('%s\t%s%s%s,\n', dumpStr, indent, kstr, vstr)
@@ -534,7 +558,7 @@ local function writeSession(sessionName, sessionData)
 	local sessionFile = io.open(sessionPath, 'w')
 
 	if not sessionFile then
-		error(('GameSession.Persist(): Cannot write session file %q.'):format(sessionPath))
+		raiseError(('Cannot write session file %q.'):format(sessionPath))
 	end
 
 	sessionFile:write('return ')
@@ -548,7 +572,6 @@ local function readSession(sessionName)
 
 	if type(sessionChunk) ~= 'function' then
 		return nil
-		--error(('GameSession.Persist(): Cannot read session file %q.'):format(sessionPath))
 	end
 
 	return sessionChunk()
@@ -628,7 +651,7 @@ end
 
 function GameSession.Persist(sessionData)
 	if type(sessionData) ~= 'table' then
-		error(('GameSession.Persist(): Session data must be a table, received %q.'):format(type(table)))
+		raiseError(('Session data must be a table, received %q.'):format(type(table)))
 	end
 
 	sessionDataRef = sessionData
