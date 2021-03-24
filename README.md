@@ -56,7 +56,7 @@ and reset mod state and free resources when the game session ends.
 
 ### `GameSession.lua` 
 
-Track game session reactively and store data linked to a game save. 
+Track game session reactively and store data linked to a save file. 
  
 Current detections:
  
@@ -67,8 +67,7 @@ Current detections:
 - Blur State (Weapon Wheel, Phone, Call Vehicle)
 - Death State
 
-Data persistence particularly useful for gameplay mods. 
-You can store and manage data linked to a save file.
+Data persistence particularly useful for gameplay mods for storing internal state. 
 
 ### `GameSettings.lua` 
 
@@ -285,8 +284,10 @@ end)
   Uses `GameUI` to determine when to show or hide the widget.  
   The widget is visible only on the default in-game HUD.  
   ![WhereAmI](https://siberx.dev/cp2077-cet-demos/whereami-210223.jpg)
-- [Kill stats](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/GameSession-KillStats/init.lua)  
+- [Kill stats recorder](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/GameSession-KillStats/init.lua)  
   Uses `GameSession` to store kill stats for each save file.  
+  Uses `GameHUD` to display on screen message on kills.  
+  ![KillStats](https://siberx.dev/cp2077-cet-demos/killstats-210324.jpg)
 - [Read player actions / inputs](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/player-actions/init.lua)
 - [Create custom map pins](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/mappin-system/init.lua)
 - [Call any vehicle with Vehicle System](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/vehicle-system/init.lua)  
