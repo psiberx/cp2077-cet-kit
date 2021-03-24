@@ -1,6 +1,7 @@
+local GameHUD = require('GameHUD')
 local GameSession = require('GameSession')
 
-local session = {
+local stats = {
 	totalKills = 0,
 	totalKillsByGroup = {},
 	lastKillLocation = nil,
@@ -36,29 +37,41 @@ local function getTargetGroups(target)
 end
 
 registerForEvent('onInit', function()
+	GameHUD.Init()
+
 	GameSession.StoreInDir('sessions')
-	GameSession.Persist(session)
+	GameSession.Persist(stats)
+
+	GameSession.OnLoad(function()
+		print('Total Kills: ' .. stats.totalKills)
+	end)
+
+	GameSession.OnStart(function()
+		GameHUD.ShowMessage('Total Kills: ' .. stats.totalKills)
+	end)
 
 	Observe('NPCPuppet', 'SendAfterDeathOrDefeatEvent', function(self)
 		if self.shouldDie and self.myKiller then
 			local player = Game.GetPlayer()
 
 			if self.myKiller:GetEntityID().hash == player:GetEntityID().hash then
-				session.totalKills = session.totalKills + 1
-				session.lastKillLocation = player:GetWorldPosition()
-				session.lastKillTimestamp = Game.GetTimeSystem():GetGameTimeStamp()
+				stats.totalKills = stats.totalKills + 1
+				stats.lastKillLocation = player:GetWorldPosition()
+				stats.lastKillTimestamp = Game.GetTimeSystem():GetGameTimeStamp()
 
 				local groups = getTargetGroups(self)
 
 				for _, group in ipairs(groups) do
-					if session.totalKillsByGroup[group] then
-						session.totalKillsByGroup[group] = session.totalKillsByGroup[group] + 1
+					if stats.totalKillsByGroup[group] then
+						stats.totalKillsByGroup[group] = stats.totalKillsByGroup[group] + 1
 					else
-						session.totalKillsByGroup[group] = 1
+						stats.totalKillsByGroup[group] = 1
 					end
 				end
 
-				print('Kill #' .. session.totalKills .. ' (' .. table.concat(groups, ', ') .. ')')
+				print('Kill #' .. stats.totalKills .. ' (' .. table.concat(groups, ', ') .. ')')
+
+				GameHUD.ShowMessage('Kill #' .. stats.totalKills)
 			end
 		end
 	end)
