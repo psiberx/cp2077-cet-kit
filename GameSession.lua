@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.3' }
+local GameSession = { version = '1.0.4' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -287,7 +287,12 @@ local function readSession(sessionName)
 	local sessionChunk = loadfile(sessionPath)
 
 	if type(sessionChunk) ~= 'function' then
-		return nil
+		sessionPath = sessionDataDir .. '/' .. (tonumber(sessionName) + 1) .. '.lua'
+		sessionChunk = loadfile(sessionPath)
+
+		if type(sessionChunk) ~= 'function' then
+			return nil
+		end
 	end
 
 	return sessionChunk()
