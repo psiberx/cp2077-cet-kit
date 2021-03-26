@@ -286,8 +286,8 @@ end)
   ![WhereAmI](https://siberx.dev/cp2077-cet-demos/whereami-210223.jpg)
 - [Kill stats recorder](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/GameSession-KillStats/init.lua)  
   Uses `GameSession` to store kill stats for each save file.  
-  Uses `GameHUD` to display on screen messages on kills.  
-  ![KillStats](https://siberx.dev/cp2077-cet-demos/killstats-210324.jpg)
+  Uses `GameHUD` to display on screen messages for kills.  
+  ![KillStats](https://siberx.dev/cp2077-cet-demos/killstats-210326.jpg)
 - [Read player actions / inputs](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/player-actions/init.lua)
 - [Create custom map pins](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/mappin-system/init.lua)
 - [Call any vehicle with Vehicle System](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/vehicle-system/init.lua)  
