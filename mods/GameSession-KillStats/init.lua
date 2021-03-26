@@ -1,18 +1,45 @@
-local GameHUD = require('GameHUD')
 local GameSession = require('GameSession')
+local GameHUD = require('GameHUD')
 
-local stats = {
+local KillStats = {
 	totalKills = 0,
 	totalKillsByGroup = {},
 	lastKillLocation = nil,
 	lastKillTimestamp = nil,
 }
 
-local function getTargetGroups(target)
-	local groups = {}
+function KillStats.TrackKill(target)
+	local kill = {
+		confirmed = false,
+		number = 0,
+		groups = nil,
+	}
 
-	-- Character Type: Human, Android, etc.
-	table.insert(groups, target:GetRecord():CharacterType():Type().value)
+	if target.shouldDie and target.myKiller then
+		local player = Game.GetPlayer()
+
+		if target.myKiller:GetEntityID().hash == player:GetEntityID().hash then
+			KillStats.totalKills = KillStats.totalKills + 1
+			KillStats.lastKillLocation = player:GetWorldPosition()
+			KillStats.lastKillTimestamp = Game.GetTimeSystem():GetGameTimeStamp()
+
+			local groups = KillStats.GetTargetGroups(target)
+
+			for _, group in ipairs(groups) do
+				KillStats.totalKillsByGroup[group] = (KillStats.totalKillsByGroup[group] or 0) + 1
+			end
+
+			kill.confirmed = true
+			kill.number = KillStats.totalKills
+			kill.groups = groups
+		end
+	end
+
+	return kill
+end
+
+function KillStats.GetTargetGroups(target)
+	local groups = {}
 
 	-- Reaction Group: Civilian, Ganger, Police
 	if target:GetStimReactionComponent() then
@@ -22,6 +49,9 @@ local function getTargetGroups(target)
 			table.insert(groups, reactionGroup)
 		end
 	end
+
+	-- Character Type: Human, Android, etc.
+	table.insert(groups, target:GetRecord():CharacterType():Type().value)
 
 	-- Tags: Cyberpsycho
 	for _, tag in ipairs(target:GetRecord():Tags()) do
@@ -40,39 +70,23 @@ registerForEvent('onInit', function()
 	GameHUD.Init()
 
 	GameSession.StoreInDir('sessions')
-	GameSession.Persist(stats)
+	GameSession.Persist(KillStats, true)
 
 	GameSession.OnLoad(function()
-		print('Total Kills: ' .. stats.totalKills)
+		print('Total Kills: ' .. KillStats.totalKills)
 	end)
 
 	GameSession.OnStart(function()
-		GameHUD.ShowMessage('Total Kills: ' .. stats.totalKills)
+		GameHUD.ShowWarning('Total Kills: ' .. KillStats.totalKills, 5.0)
 	end)
 
 	Observe('NPCPuppet', 'SendAfterDeathOrDefeatEvent', function(self)
-		if self.shouldDie and self.myKiller then
-			local player = Game.GetPlayer()
+		local kill = KillStats.TrackKill(self)
 
-			if self.myKiller:GetEntityID().hash == player:GetEntityID().hash then
-				stats.totalKills = stats.totalKills + 1
-				stats.lastKillLocation = player:GetWorldPosition()
-				stats.lastKillTimestamp = Game.GetTimeSystem():GetGameTimeStamp()
+		if kill.confirmed then
+			GameHUD.ShowMessage('Kill #' .. kill.number .. ' ' .. kill.groups[1])
 
-				local groups = getTargetGroups(self)
-
-				for _, group in ipairs(groups) do
-					if stats.totalKillsByGroup[group] then
-						stats.totalKillsByGroup[group] = stats.totalKillsByGroup[group] + 1
-					else
-						stats.totalKillsByGroup[group] = 1
-					end
-				end
-
-				print('Kill #' .. stats.totalKills .. ' (' .. table.concat(groups, ', ') .. ')')
-
-				GameHUD.ShowMessage('Kill #' .. stats.totalKills)
-			end
+			print('Kill #' .. kill.number .. ' (' .. table.concat(kill.groups, ', ') .. ')')
 		end
 	end)
 end)

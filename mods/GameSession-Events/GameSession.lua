@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.4' }
+local GameSession = { version = '1.0.5' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -209,6 +209,7 @@ end
 local sessionDataDir
 local sessionDataRef
 local sessionDataTmpl
+local sessionDataRelaxed = false
 
 local function exportSession(t, max, depth)
 	if type(t) ~= 'table' then
@@ -230,7 +231,7 @@ local function exportSession(t, max, depth)
 			kstr = string.format('[%q] = ', k)
 		end
 
-		local vstr
+		local vstr = ''
 		if vtype == 'string' then
 			vstr = string.format('%q', v)
 		elseif vtype == 'table' then
@@ -240,24 +241,32 @@ local function exportSession(t, max, depth)
 		elseif vtype == 'userdata' then
 			vstr = tostring(v)
 			if vstr:find('^sol%.') then
-				vtype = vstr:match('^sol%.(.+):')
-				if ktype == 'string' then
-					raiseError(('Cannot store userdata of type %q in the %q field.'):format(vtype, k))
+				if not sessionDataRelaxed then
+					vtype = vstr:match('^sol%.(.+):')
+					if ktype == 'string' then
+						raiseError(('Cannot store userdata of type %q in the %q field.'):format(vtype, k))
+					else
+						raiseError(('Cannot store userdata of type %q.'):format(vtype))
+					end
 				else
-					raiseError(('Cannot store userdata of type %q.'):format(vtype))
+					vstr = ''
 				end
 			end
 		elseif vtype == 'function' or vtype == 'thread' then
-			if ktype == 'string' then
-				raiseError(('Cannot store %s in the %q field.'):format(vtype, k))
-			else
-				raiseError(('Cannot store %s.'):format(vtype))
+			if not sessionDataRelaxed then
+				if ktype == 'string' then
+					raiseError(('Cannot store %s in the %q field.'):format(vtype, k))
+				else
+					raiseError(('Cannot store %s.'):format(vtype))
+				end
 			end
 		else
 			vstr = tostring(v)
 		end
 
-		dumpStr = string.format('%s\t%s%s%s,\n', dumpStr, indent, kstr, vstr)
+		if vstr ~= '' then
+			dumpStr = string.format('%s\t%s%s%s,\n', dumpStr, indent, kstr, vstr)
+		end
 	end
 
 	return string.format('%s%s}', dumpStr, indent)
@@ -668,12 +677,13 @@ function GameSession.StoreInDir(sessionDir)
 	initialize(GameSession.Event.SaveData)
 end
 
-function GameSession.Persist(sessionData)
+function GameSession.Persist(sessionData, relaxedMode)
 	if type(sessionData) ~= 'table' then
 		raiseError(('Session data must be a table, received %s.'):format(type(sessionData)))
 	end
 
 	sessionDataRef = sessionData
+	sessionDataRelaxed = relaxedMode and true or false
 	sessionDataTmpl = exportSession(sessionData)
 
 	initialize(GameSession.Event.SaveData)
