@@ -16,7 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.0.0' }
+local GameUI = { version = '1.0.1' }
 
 function restoreEnvironment() end
 
@@ -411,6 +411,7 @@ local function initialize(event)
 			--spdlog.error(('RadialWheelController::RegisterBlackboards(%s)'):format(tostring(loaded)))
 
 			if loaded then
+				updateLoading(false)
 				updateLoaded(true)
 				updateMenuScenario()
 				refreshCurrentState()
