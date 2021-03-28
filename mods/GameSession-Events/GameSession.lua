@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.5' }
+local GameSession = { version = '1.0.6' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -240,13 +240,15 @@ local function exportSession(t, max, depth)
 			end
 		elseif vtype == 'userdata' then
 			vstr = tostring(v)
-			if vstr:find('^sol%.') then
+			if vstr:find('^userdata:') or vstr:find('^sol%.') then
 				if not sessionDataRelaxed then
-					vtype = vstr:match('^sol%.(.+):')
+					--vtype = vstr:match('^sol%.(.+):')
 					if ktype == 'string' then
-						raiseError(('Cannot store userdata of type %q in the %q field.'):format(vtype, k))
+						raiseError(('Cannot store userdata in the %q field.'):format(k))
+						--raiseError(('Cannot store userdata of type %q in the %q field.'):format(vtype, k))
 					else
-						raiseError(('Cannot store userdata of type %q.'):format(vtype))
+						raiseError(('Cannot store userdata in the list.'))
+						--raiseError(('Cannot store userdata of type %q.'):format(vtype))
 					end
 				else
 					vstr = ''
