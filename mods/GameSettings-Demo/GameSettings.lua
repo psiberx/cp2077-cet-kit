@@ -5,7 +5,7 @@ Game Settings Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSettings = { version = '1.0.0' }
+local GameSettings = { version = '1.0.1' }
 
 local module = {}
 
@@ -192,6 +192,14 @@ function GameSettings.Toggle(setting)
 	end
 
 	var:Toggle()
+end
+
+function GameSettings.ToggleAll(settings)
+	local state = not GameSettings.Get(settings[1])
+
+	for _, setting in ipairs(settings) do
+		GameSettings.Set(setting, state)
+	end
 end
 
 function GameSettings.Options(setting)
