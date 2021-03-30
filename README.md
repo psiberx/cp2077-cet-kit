@@ -264,17 +264,20 @@ end)
 local GameSettings = require('GameSettings')
 
 registerHotkey('ToggleHUD', 'Toggle HUD', function()
-    GameSettings.Toggle('/interface/hud/action_buttons')
-    GameSettings.Toggle('/interface/hud/activity_log')
-    GameSettings.Toggle('/interface/hud/ammo_counter')
-    GameSettings.Toggle('/interface/hud/chatters')
-    GameSettings.Toggle('/interface/hud/healthbar')
-    GameSettings.Toggle('/interface/hud/input_hints')
-    GameSettings.Toggle('/interface/hud/johnny_hud')
-    GameSettings.Toggle('/interface/hud/minimap')
-    GameSettings.Toggle('/interface/hud/npc_healthbar')
-    GameSettings.Toggle('/interface/hud/quest_tracker')
-    GameSettings.Toggle('/interface/hud/stamina_oxygen')
+    GameSettings.ToggleAll({
+        '/interface/hud/action_buttons',
+        '/interface/hud/activity_log',
+        '/interface/hud/ammo_counter',
+        '/interface/hud/healthbar',
+        '/interface/hud/input_hints',
+        '/interface/hud/johnny_hud',
+        '/interface/hud/minimap',
+        '/interface/hud/npc_healthbar',
+        '/interface/hud/npc_names',
+        '/interface/hud/object_markers',
+        '/interface/hud/quest_tracker',
+        '/interface/hud/stamina_oxygen',
+    })
 end)
 ```
 
