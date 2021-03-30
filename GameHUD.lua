@@ -4,7 +4,7 @@ GameHUD.lua
 Copyright (c) 2021 psiberx
 ]]
 
-local GameHUD = { version = '0.1.0' }
+local GameHUD = { version = '0.1.1' }
 
 local messageController
 
@@ -15,13 +15,15 @@ function GameHUD.Init()
 end
 
 function GameHUD.ShowMessage(text)
-	local message = NewObject('gameSimpleScreenMessage')
-	message.isShown = true
-	message.duration = 5.0
-	message.message = text
+	if messageController then
+		local message = NewObject('gameSimpleScreenMessage')
+		message.isShown = true
+		message.duration = 5.0
+		message.message = text
 
-	messageController.screenMessage = message
-	messageController:UpdateWidgets()
+		messageController.screenMessage = message
+		messageController:UpdateWidgets()
+	end
 end
 
 function GameHUD.ShowWarning(text, duration)
