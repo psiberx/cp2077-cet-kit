@@ -291,8 +291,3 @@ end)
   Uses `GameSession` to store kill stats for each save file.  
   Uses `GameHUD` to display on screen messages for kills.  
   ![KillStats](https://siberx.dev/cp2077-cet-demos/killstats-210326.jpg)
-- [Read player actions / inputs](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/player-actions/init.lua)
-- [Create custom map pins](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/mappin-system/init.lua)
-- [Call any vehicle with Vehicle System](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/vehicle-system/init.lua)  
-- [Fix Dead-Eye with TweakDB](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/dead-eye-fix/init.lua)
-- [Manage game settings](https://github.com/psiberx/cp2077-cet-kit/blob/main/mods/settings-system/init.lua)
