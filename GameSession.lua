@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.6' }
+local GameSession = { version = '1.0.7' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -460,7 +460,9 @@ local function initialize(event)
 		end)
 
 		Observe('LoadGameMenuGameController', 'OnSaveMetadataReady', function(saveInfo)
-			saveList[saveInfo.saveIndex] = saveInfo
+			saveList[saveInfo.saveIndex] = {
+				timestamp = tostring(saveInfo.timestamp):gsub('ULL$', '')
+			}
 		end)
 
 		Observe('LoadGameMenuGameController', 'LoadSaveInGame', function(_, saveIndex)
