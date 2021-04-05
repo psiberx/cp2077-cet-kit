@@ -5,7 +5,7 @@ Game Settings Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSettings = { version = '1.0.1' }
+local GameSettings = { version = '1.0.2' }
 
 local module = {}
 
@@ -39,6 +39,22 @@ function module.isNumberType(target)
 	end
 
 	return target == 'Int' or target == 'Float'
+end
+
+function module.isIntType(target)
+	if type(target) == 'userdata' then
+		target = target.value
+	end
+
+	return target == 'Int' or target == 'IntList'
+end
+
+function module.isFloatType(target)
+	if type(target) == 'userdata' then
+		target = target.value
+	end
+
+	return target == 'Float' or target == 'FloatList'
 end
 
 function module.isListType(target)
@@ -202,6 +218,23 @@ function GameSettings.ToggleAll(settings)
 	end
 end
 
+function GameSettings.ToggleGroup(path)
+	local group = Game.GetSettingsSystem():GetGroup(path)
+	local vars = group:GetVars(false)
+	local state = nil
+
+	for _, var in ipairs(vars) do
+		if module.isBoolType(var:GetType()) then
+			-- Invert the first bool option
+			if state == nil then
+				state = not var:GetValue()
+			end
+
+			var:SetValue(state)
+		end
+	end
+end
+
 function GameSettings.Options(setting)
 	local path, name = module.parsePath(setting)
 
@@ -275,6 +308,12 @@ function GameSettings.ExportTo(exportPath, isPreGame)
 			end
 
 			options = ' -- ' .. table.concat(options, ' | ')
+		elseif var.min then
+			if module.isIntType(var.type) then
+				options = (' -- %d to %d / %d'):format(var.min, var.max, var.step)
+			else
+				options = (' -- %.2f to %.2f / %.2f'):format(var.min, var.max, var.step)
+			end
 		end
 
 		table.insert(output, ('  ["%s"] = %s,%s'):format(var.path, value, options or ''))
