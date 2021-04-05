@@ -37,18 +37,22 @@ registerHotkey('SwitchResolution', 'Switch resolution', function()
 end)
 
 registerHotkey('ToggleHUD', 'Toggle HUD', function()
-	GameSettings.ToggleAll({
-		'/interface/hud/action_buttons',
-		'/interface/hud/activity_log',
-		'/interface/hud/ammo_counter',
-		'/interface/hud/healthbar',
-		'/interface/hud/input_hints',
-		'/interface/hud/johnny_hud',
-		'/interface/hud/minimap',
-		'/interface/hud/npc_healthbar',
-		'/interface/hud/npc_names',
-		'/interface/hud/object_markers',
-		'/interface/hud/quest_tracker',
-		'/interface/hud/stamina_oxygen',
-	})
+	-- Option 1: Toggle all settings in the group
+	GameSettings.ToggleGroup('/interface/hud')
+
+	-- Option 2: Toggle specific settings
+	--GameSettings.ToggleAll({
+	--	'/interface/hud/action_buttons',
+	--	'/interface/hud/activity_log',
+	--	'/interface/hud/ammo_counter',
+	--	'/interface/hud/healthbar',
+	--	'/interface/hud/input_hints',
+	--	'/interface/hud/johnny_hud',
+	--	'/interface/hud/minimap',
+	--	'/interface/hud/npc_healthbar',
+	--	'/interface/hud/npc_names',
+	--	'/interface/hud/object_markers',
+	--	'/interface/hud/quest_tracker',
+	--	'/interface/hud/stamina_oxygen',
+	--})
 end)
