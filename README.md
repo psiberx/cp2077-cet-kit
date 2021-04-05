@@ -24,7 +24,7 @@ Current detections:
   * New Game (Difficulty, Life Path, Body Type, Customization, Attributes, Summary)
   * Pause Menu (Save Game, Load Game, Settings, Credits) 
   * Death Menu (Load Game, Settings)
-  * Hub (Inventory, Backpack, Cyberware, Character, Stats, Crafting, Journal, Messages, Shards, Tarot, Database)
+  * Hub (Backpack, Inventory, Cyberware, Character, Stats, Map, Crafting, Journal, Messages, Shards, Tarot, Database)
   * Vendor (Trade, RipperDoc, Drop Point)
   * Network Breach
   * Fast Travel
@@ -49,11 +49,6 @@ Todo:
 
 You can display own HUD elements and apply contextual logic depending on the current UI.
 
-If you don't need UI, this module can be used to efficiently detect
-when a player is loading into the game or exiting the current game session. 
-You can initialize mod state when the actual gameplay starts, 
-and reset mod state and free resources when the game session ends.
-
 ### `GameSession.lua` 
 
 Track game session reactively and store data linked to a save file. 
@@ -67,7 +62,13 @@ Current detections:
 - Blur State (Weapon Wheel, Phone, Call Vehicle)
 - Death State
 
-Data persistence particularly useful for gameplay mods for storing internal state. 
+This module can be used to efficiently detect when a player 
+is loading into the game or exiting the current game session. 
+You can initialize mod state when the actual gameplay starts, 
+and reset mod state and free resources when the game session ends.
+
+Data persistence feature particularly useful for gameplay mods 
+for storing its internal state.
 
 ### `GameSettings.lua` 
 
@@ -107,19 +108,6 @@ end)
 registerForEvent('onUpdate', function(delta)
     -- This is required for Cron to function
     Cron.Update(delta)
-end)
-```
-
-### Track UI Changes
-
-```lua
-local GameUI = require('GameUI')
-
-registerForEvent('onInit', function()
-    -- Listen for every UI state change
-    GameUI.Observe(function(state)
-        GameUI.PrintState(state)
-    end)
 end)
 ```
 
@@ -197,6 +185,9 @@ local userState = {
 registerForEvent('onInit', function()
     GameSession.StoreInDir('sessions') -- Set directory to store session data
     GameSession.Persist(userState) -- Link the data that should be watched and persisted 
+    GameSession.OnLoad(function()
+        print('Console was opened', userState.consoleUses, 'time(s)') -- Show the number on gamesave load 
+    end)
 end)
 
 registerForEvent('onOverlayOpen', function()
