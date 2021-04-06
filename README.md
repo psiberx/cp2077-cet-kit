@@ -251,6 +251,18 @@ end)
 
 ### Toggle HUD With Hotkey
 
+Option 1 &ndash; Toggle all settings in the group:
+
+```lua
+local GameSettings = require('GameSettings')
+
+registerHotkey('ToggleHUD', 'Toggle HUD', function()
+	GameSettings.ToggleGroup('/interface/hud')
+end)
+```
+
+Option 2 &ndash; Toggle specific settings:
+
 ```lua
 local GameSettings = require('GameSettings')
 
