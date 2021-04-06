@@ -186,7 +186,7 @@ registerForEvent('onInit', function()
     GameSession.StoreInDir('sessions') -- Set directory to store session data
     GameSession.Persist(userState) -- Link the data that should be watched and persisted 
     GameSession.OnLoad(function()
-        print('Console was opened', userState.consoleUses, 'time(s)') -- Show the number on gamesave load 
+        print('Console was opened', userState.consoleUses, 'time(s)') -- Show the number on load 
     end)
 end)
 
