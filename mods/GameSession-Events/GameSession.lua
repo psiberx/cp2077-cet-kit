@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.8' }
+local GameSession = { version = '1.0.9' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -378,14 +378,16 @@ local function initialize(event)
 			end
 		end)
 
-		Observe('PlayerPuppet', 'OnDetach', function()
-			--spdlog.error(('PlayerPuppet::OnDetach()'))
+		Observe('QuestTrackerGameController', 'OnUninitialize', function()
+			--spdlog.error(('QuestTrackerGameController::OnUninitialize()'))
 
-			if updateLoaded(false) then
-				updatePaused(true)
-				updateBlurred(false)
-				updateDead(false)
-				notifyObservers()
+			if Game.GetPlayer() == nil then
+				if updateLoaded(false) then
+					updatePaused(true)
+					updateBlurred(false)
+					updateDead(false)
+					notifyObservers()
+				end
 			end
 		end)
 

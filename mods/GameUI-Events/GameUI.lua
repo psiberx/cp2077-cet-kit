@@ -16,7 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.0.2' }
+local GameUI = { version = '1.0.3' }
 
 function restoreEnvironment() end
 
@@ -227,15 +227,15 @@ end
 local function updateContext(oldContext, newContext)
 	if oldContext == nil and newContext == nil then
 		contextStack = {}
-	elseif oldContext == nil then
-		table.insert(contextStack, newContext)
-	elseif newContext == nil then
+	elseif oldContext ~= nil then
 		for i = #contextStack, 1, -1 do
 			if contextStack[i].value == oldContext.value then
 				table.remove(contextStack, i)
 				break
 			end
 		end
+	elseif newContext ~= nil then
+		table.insert(contextStack, newContext)
 	else
 		if #contextStack > 0 and contextStack[#contextStack].value == oldContext.value then
 			contextStack[#contextStack] = newContext
@@ -264,6 +264,10 @@ local function refreshCurrentState()
 		if isDetached then
 			currentMenu = 'MainMenu'
 		end
+	end
+
+	if isBraindance and #contextStack == 0 then
+		updateContext(nil, GameUI.Context.BraindancePlayback)
 	end
 end
 
@@ -414,20 +418,22 @@ local function initialize(event)
 			end
 		end)
 
-		Observe('PlayerPuppet', 'OnDetach', function()
-			--spdlog.error(('PlayerPuppet::OnDetach()'))
+		Observe('QuestTrackerGameController', 'OnUninitialize', function()
+			--spdlog.error(('QuestTrackerGameController::OnUninitialize()'))
 
-			updateDetached(true)
-			updateBraindance(false)
-			updatePhotoMode(false)
-			updateSceneTier(1)
-			updateVehicle(false)
-			updateContext()
+			if Game.GetPlayer() == nil then
+				updateDetached(true)
+				updateBraindance(false)
+				updatePhotoMode(false)
+				updateSceneTier(1)
+				updateVehicle(false)
+				updateContext()
 
-			if currentMenu ~= 'MainMenu' then
-				notifyObservers()
-			else
-				pushCurrentState()
+				if currentMenu ~= 'MainMenu' then
+					notifyObservers()
+				else
+					pushCurrentState()
+				end
 			end
 		end)
 
