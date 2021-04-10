@@ -351,7 +351,10 @@ local function initialize(event)
 					local eventName = stateProp.event[eventKey]
 
 					if eventName then
-						eventScopes[eventName] = {}
+						if not eventScopes[eventName] then
+							eventScopes[eventName] = {}
+						end
+
 						eventScopes[eventName][eventScope] = true
 					end
 				end
@@ -405,17 +408,10 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
-		Observe('gameuiTutorialPopupGameController', 'OnInitialize', function()
-			--spdlog.error(('gameuiTutorialPopupGameController::OnInitialize()'))
+		Observe('gameuiTutorialPopupGameController', 'PauseGame', function(_, tutorialActive)
+			--spdlog.error(('gameuiTutorialPopupGameController::PauseGame(%s)'):format(tostring(tutorialActive)))
 
-			updatePaused(true)
-			notifyObservers()
-		end)
-
-		Observe('gameuiTutorialPopupGameController', 'OnUninitialize', function()
-			--spdlog.error(('gameuiTutorialPopupGameController::OnUninitialize()'))
-
-			updatePaused(false)
+			updatePaused(tutorialActive)
 			notifyObservers()
 		end)
 

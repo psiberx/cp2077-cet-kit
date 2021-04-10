@@ -496,13 +496,14 @@ local function initialize(event)
 
 			if Game.GetPlayer() == nil then
 				updateDetached(true)
-				updateBraindance(false)
-				updatePhotoMode(false)
 				updateSceneTier(1)
-				updateVehicle(false, false)
 				updateContext()
+				updateVehicle(false, false)
+				updateBraindance(false)
+				updateCyberspace(false)
 				updatePossessed(false)
 				updateFlashback(false)
+				updatePhotoMode(false)
 
 				if currentMenu ~= 'MainMenu' then
 					notifyObservers()
@@ -780,6 +781,8 @@ local function initialize(event)
 
 	if required[GameUI.Event.Tutorial] and not initialized[GameUI.Event.Tutorial] then
 		Observe('gameuiTutorialPopupGameController', 'PauseGame', function(_, tutorialActive)
+			--spdlog.error(('gameuiTutorialPopupGameController::PauseGame(%s)'):format(tostring(tutorialActive)))
+
 			updateTutorial(tutorialActive)
 			notifyObservers()
 		end)
