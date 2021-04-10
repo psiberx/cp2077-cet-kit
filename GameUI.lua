@@ -16,7 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.0.3' }
+local GameUI = { version = '1.1.0' }
 
 GameUI.Event = {
 	Braindance = 'Braindance',
