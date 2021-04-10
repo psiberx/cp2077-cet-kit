@@ -781,6 +781,7 @@ local function initialize(event)
 
 	if not initialized.state then
 		refreshCurrentState()
+		pushCurrentState()
 
 		initialized.state = true
 	end
