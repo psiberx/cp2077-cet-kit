@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.9' }
+local GameSession = { version = '1.1.0' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -111,8 +111,9 @@ local function refreshCurrentState()
 	local player = Game.GetPlayer()
 	local blackboardDefs = Game.GetAllBlackboardDefs()
 	local blackboardUI = Game.GetBlackboardSystem():Get(blackboardDefs.UI_System)
+	local tutorialActive = Game.GetTimeSystem():IsTimeDilationActive('UI_TutorialPopup')
 
-	updatePaused(blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu))
+	updatePaused(blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu) or tutorialActive)
 	updateBlurred(blackboardUI:GetBool(blackboardDefs.UI_System.CircularBlurEnabled))
 	updateDead(player:IsDeadNoStatPool())
 
@@ -350,7 +351,10 @@ local function initialize(event)
 					local eventName = stateProp.event[eventKey]
 
 					if eventName then
-						eventScopes[eventName] = {}
+						if not eventScopes[eventName] then
+							eventScopes[eventName] = {}
+						end
+
 						eventScopes[eventName][eventScope] = true
 					end
 				end
@@ -404,6 +408,13 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
+		Observe('gameuiTutorialPopupGameController', 'PauseGame', function(_, tutorialActive)
+			--spdlog.error(('gameuiTutorialPopupGameController::PauseGame(%s)'):format(tostring(tutorialActive)))
+
+			updatePaused(tutorialActive)
+			notifyObservers()
+		end)
+
 		initialized[GameSession.Scope.Pause] = true
 	end
 
@@ -453,6 +464,11 @@ local function initialize(event)
 				end)
 			end
 		end
+
+		Observe('PhoneMessagePopupGameController', 'SetTimeDilatation', function(_, popupActive)
+			updateBlurred(popupActive)
+			notifyObservers()
+		end)
 
 		initialized[GameSession.Scope.Blur] = true
 	end

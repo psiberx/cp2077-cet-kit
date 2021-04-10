@@ -1,5 +1,7 @@
 local GameSession = require('GameSession')
 
 registerForEvent('onInit', function()
-	GameSession.Listen(GameSession.PrintState)
+	GameSession.Listen(function(state)
+		GameSession.PrintState(state)
+	end)
 end)

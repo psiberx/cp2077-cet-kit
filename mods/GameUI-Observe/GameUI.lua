@@ -16,9 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.0.3' }
-
-function restoreEnvironment() end
+local GameUI = { version = '1.1.0' }
 
 GameUI.Event = {
 	Braindance = 'Braindance',
@@ -26,12 +24,19 @@ GameUI.Event = {
 	BraindanceExit = 'BraindanceExit',
 	Camera = 'Camera',
 	Context = 'Context',
+	Cyberspace = 'Cyberspace',
+	CyberspaceEnter = 'CyberspaceEnter',
+	CyberspaceExit = 'CyberspaceExit',
 	Device = 'Device',
 	DeviceEnter = 'DeviceEnter',
 	DeviceExit = 'DeviceExit',
 	FastTravel = 'FastTravel',
 	FastTravelFinish = 'FastTravelFinish',
 	FastTravelStart = 'FastTravelStart',
+	Flashback = 'Flashback',
+	FlashbackEnd = 'FlashbackEnd',
+	FlashbackStart = 'FlashbackStart',
+	Johnny = 'Johnny',
 	Loading = 'Loading',
 	LoadingFinish = 'LoadingFinish',
 	LoadingStart = 'LoadingStart',
@@ -45,6 +50,9 @@ GameUI.Event = {
 	Popup = 'Popup',
 	PopupClose = 'PopupClose',
 	PopupOpen = 'PopupOpen',
+	Possession = 'Possession',
+	PossessionEnd = 'PossessionEnd',
+	PossessionStart = 'PossessionStart',
 	QuickHack = 'QuickHack',
 	QuickHackClose = 'QuickHackClose',
 	QuickHackOpen = 'QuickHackOpen',
@@ -57,6 +65,9 @@ GameUI.Event = {
 	Session = 'Session',
 	SessionEnd = 'SessionEnd',
 	SessionStart = 'SessionStart',
+	Tutorial = 'Tutorial',
+	TutorialClose = 'TutorialClose',
+	TutorialOpen = 'TutorialOpen',
 	Update = 'Update',
 	Vehicle = 'Vehicle',
 	VehicleEnter = 'VehicleEnter',
@@ -69,16 +80,21 @@ GameUI.Event = {
 GameUI.StateEvent = {
 	[GameUI.Event.Braindance] = GameUI.Event.Braindance,
 	[GameUI.Event.Context] = GameUI.Event.Context,
+	[GameUI.Event.Cyberspace] = GameUI.Event.Cyberspace,
 	[GameUI.Event.Device] = GameUI.Event.Device,
 	[GameUI.Event.FastTravel] = GameUI.Event.FastTravel,
+	[GameUI.Event.Flashback] = GameUI.Event.Flashback,
+	[GameUI.Event.Johnny] = GameUI.Event.Johnny,
 	[GameUI.Event.Loading] = GameUI.Event.Loading,
 	[GameUI.Event.Menu] = GameUI.Event.Menu,
 	[GameUI.Event.PhotoMode] = GameUI.Event.PhotoMode,
 	[GameUI.Event.Popup] = GameUI.Event.Popup,
+	[GameUI.Event.Possession] = GameUI.Event.Possession,
 	[GameUI.Event.QuickHack] = GameUI.Event.QuickHack,
 	[GameUI.Event.Scanner] = GameUI.Event.Scanner,
 	[GameUI.Event.Scene] = GameUI.Event.Scene,
 	[GameUI.Event.Session] = GameUI.Event.Session,
+	[GameUI.Event.Tutorial] = GameUI.Event.Tutorial,
 	[GameUI.Event.Update] = GameUI.Event.Update,
 	[GameUI.Event.Vehicle] = GameUI.Event.Vehicle,
 	[GameUI.Event.Wheel] = GameUI.Event.Wheel,
@@ -91,6 +107,7 @@ GameUI.Camera = {
 
 local initialized = {}
 local listeners = {}
+local updateQueue = {}
 local previousState = {
 	isDetached = true,
 	isMenu = false,
@@ -105,7 +122,11 @@ local isVehicle = false
 local isBraindance = false
 local isFastTravel = false
 local isPhotoMode = false
+local isTutorial = false
 local sceneTier = 4
+local isPossessed = false
+local isFlashback = false
+local isCyberspace = false
 local currentMenu = false
 local currentSubmenu = false
 local currentCamera = GameUI.Camera.FirstPerson
@@ -120,6 +141,10 @@ local stateProps = {
 	{ current = 'isVehicle', previous = 'wasVehicle', event = { change = GameUI.Event.Vehicle, on = GameUI.Event.VehicleEnter, off = GameUI.Event.VehicleExit } },
 	{ current = 'isBraindance', previous = 'wasBraindance', event = { change = GameUI.Event.Braindance, on = GameUI.Event.BraindanceEnter, off = GameUI.Event.BraindanceExit } },
 	{ current = 'isFastTravel', previous = 'wasFastTravel', event = { change = GameUI.Event.FastTravel, on = GameUI.Event.FastTravelStart, off = GameUI.Event.FastTravelFinish } },
+	{ current = 'isJohnny', previous = 'wasJohnny', event = { change = GameUI.Event.Johnny } },
+	{ current = 'isPossessed', previous = 'wasPossessed', event = { change = GameUI.Event.Possession, on = GameUI.Event.PossessionStart, off = GameUI.Event.PossessionEnd, scope = GameUI.Event.Johnny } },
+	{ current = 'isFlashback', previous = 'wasFlashback', event = { change = GameUI.Event.Flashback, on = GameUI.Event.FlashbackStart, off = GameUI.Event.FlashbackEnd, scope = GameUI.Event.Johnny } },
+	{ current = 'isCyberspace', previous = 'wasCyberspace', event = { change = GameUI.Event.Cyberspace, on = GameUI.Event.CyberspaceEnter, off = GameUI.Event.CyberspaceExit } },
 	{ current = 'isDefault', previous = 'wasDefault' },
 	{ current = 'isScanner', previous = 'wasScanner', event = { change = GameUI.Event.Scanner, on = GameUI.Event.ScannerOpen, off = GameUI.Event.ScannerClose, scope = GameUI.Event.Context } },
 	{ current = 'isQuickHack', previous = 'wasQuickHack', event = { change = GameUI.Event.QuickHack, on = GameUI.Event.QuickHackOpen, off = GameUI.Event.QuickHackClose, scope = GameUI.Event.Context } },
@@ -127,6 +152,7 @@ local stateProps = {
 	{ current = 'isWheel', previous = 'wasWheel', event = { change = GameUI.Event.Wheel, on = GameUI.Event.WheelOpen, off = GameUI.Event.WheelClose, scope = GameUI.Event.Context } },
 	{ current = 'isDevice', previous = 'wasDevice', event = { change = GameUI.Event.Device, on = GameUI.Event.DeviceEnter, off = GameUI.Event.DeviceExit, scope = GameUI.Event.Context } },
 	{ current = 'isPhoto', previous = 'wasPhoto', event = { change = GameUI.Event.PhotoMode, on = GameUI.Event.PhotoModeOpen, off = GameUI.Event.PhotoModeClose } },
+	{ current = 'isTutorial', previous = 'wasTutorial', event = { change = GameUI.Event.Tutorial, on = GameUI.Event.TutorialOpen, off = GameUI.Event.TutorialClose } },
 	{ current = 'menu', previous = 'lastMenu', event = { change = GameUI.Event.MenuNav, reqs = { isMenu = true, wasMenu = true }, scope = GameUI.Event.Menu } },
 	{ current = 'submenu', previous = 'lastSubmenu', event = { change = GameUI.Event.MenuNav, reqs = { isMenu = true, wasMenu = true }, scope = GameUI.Event.Menu } },
 	{ current = 'camera', previous = 'lastCamera', event = { change = GameUI.Event.Camera, scope = GameUI.Event.Vehicle }, parent = 'isVehicle' },
@@ -220,8 +246,24 @@ local function updatePhotoMode(photoModeActive)
 	isPhotoMode = photoModeActive
 end
 
+local function updateTutorial(tutorialActive)
+	isTutorial = tutorialActive
+end
+
 local function updateSceneTier(sceneTierValue)
-	sceneTier = sceneTierValue -- gamePSMHighLevel?
+	sceneTier = sceneTierValue
+end
+
+local function updatePossessed(possessionActive)
+	isPossessed = possessionActive
+end
+
+local function updateFlashback(flashbacklActive)
+	isFlashback = flashbacklActive
+end
+
+local function updateCyberspace(isCyberspacePresence)
+	isCyberspace = isCyberspacePresence
 end
 
 local function updateContext(oldContext, newContext)
@@ -244,19 +286,29 @@ local function updateContext(oldContext, newContext)
 end
 
 local function refreshCurrentState()
-	local playerId = Game.GetPlayer():GetEntityID()
+	local player = Game.GetPlayer()
 	local blackboardDefs = Game.GetAllBlackboardDefs()
 	local blackboardUI = Game.GetBlackboardSystem():Get(blackboardDefs.UI_System)
 	local blackboardVH = Game.GetBlackboardSystem():Get(blackboardDefs.UI_ActiveVehicleData)
 	local blackboardBD = Game.GetBlackboardSystem():Get(blackboardDefs.Braindance)
 	local blackboardPM = Game.GetBlackboardSystem():Get(blackboardDefs.PhotoMode)
-	local blackboardPSM = Game.GetBlackboardSystem():GetLocalInstanced(playerId, blackboardDefs.PlayerStateMachine)
+	local blackboardPSM = Game.GetBlackboardSystem():GetLocalInstanced(player:GetEntityID(), blackboardDefs.PlayerStateMachine)
 
 	updateMenu(blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu))
-	updateVehicle(blackboardVH:GetBool(blackboardDefs.UI_ActiveVehicleData.IsPlayerMounted, blackboardDefs.UI_ActiveVehicleData.IsTPPCameraOn))
-	updateBraindance(blackboardBD:GetBool(blackboardDefs.Braindance.IsActive))
-	updatePhotoMode(blackboardPM:GetBool(blackboardDefs.PhotoMode.IsActive))
+	updateTutorial(Game.GetTimeSystem():IsTimeDilationActive('UI_TutorialPopup'))
+
 	updateSceneTier(blackboardPSM:GetInt(blackboardDefs.PlayerStateMachine.SceneTier))
+	updateVehicle(
+		blackboardVH:GetBool(blackboardDefs.UI_ActiveVehicleData.IsPlayerMounted),
+		blackboardVH:GetBool(blackboardDefs.UI_ActiveVehicleData.IsTPPCameraOn)
+	)
+
+	updateBraindance(blackboardBD:GetBool(blackboardDefs.Braindance.IsActive))
+
+	updatePossessed(Game.GetQuestsSystem():GetFactStr(Game.GetPlayerSystem():GetPossessedByJohnnyFactName()) == 1)
+	updateFlashback(player:IsJohnnyReplacer())
+
+	updatePhotoMode(blackboardPM:GetBool(blackboardDefs.PhotoMode.IsActive))
 
 	if not isLoaded then
 		updateDetached(GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame())
@@ -266,8 +318,26 @@ local function refreshCurrentState()
 		end
 	end
 
-	if isBraindance and #contextStack == 0 then
-		updateContext(nil, GameUI.Context.BraindancePlayback)
+	if #contextStack == 0 then
+		if isBraindance then
+			updateContext(nil, GameUI.Context.BraindancePlayback)
+		elseif Game.GetTimeSystem():IsTimeDilationActive('radial') then
+			updateContext(nil, GameUI.Context.ModalPopup)
+		end
+	end
+end
+
+local function pushCurrentState()
+	previousState = GameUI.GetState()
+end
+
+local function applyQueuedChanges()
+	if #updateQueue > 0 then
+		for _, updateCallback in ipairs(updateQueue) do
+			updateCallback()
+		end
+
+		updateQueue = {}
 	end
 end
 
@@ -320,6 +390,10 @@ local function determineEvents(currentState)
 end
 
 local function notifyObservers()
+	if not isDetached then
+		applyQueuedChanges()
+	end
+
 	local currentState = GameUI.GetState()
 	local stateChanged = false
 
@@ -358,8 +432,13 @@ local function notifyObservers()
 	end
 end
 
-local function pushCurrentState()
-	previousState = GameUI.GetState()
+local function notifyAfterStart(updateCallback)
+	if not isDetached then
+		updateCallback()
+		notifyObservers()
+	else
+		table.insert(updateQueue, updateCallback)
+	end
 end
 
 local function initialize(event)
@@ -377,10 +456,6 @@ local function initialize(event)
 			VehicleRace = Enum.new('UIGameContext', 9),
 		}
 
-		Enum.__eq = function(a, b)
-			return a.value == b.value
-		end
-
 		for _, stateProp in ipairs(stateProps) do
 			if stateProp.event then
 				local eventScope = stateProp.event.scope or stateProp.event.change
@@ -389,7 +464,11 @@ local function initialize(event)
 					local eventName = stateProp.event[eventKey]
 
 					if eventName then
-						eventScopes[eventName] = {}
+						if not eventScopes[eventName] then
+							eventScopes[eventName] = {}
+							eventScopes[eventName][GameUI.Event.Session] = true
+						end
+
 						eventScopes[eventName][eventScope] = true
 					end
 				end
@@ -413,6 +492,7 @@ local function initialize(event)
 				updateLoading(false)
 				updateLoaded(true)
 				updateMenuScenario()
+				applyQueuedChanges()
 				refreshCurrentState()
 				notifyObservers()
 			end
@@ -423,11 +503,14 @@ local function initialize(event)
 
 			if Game.GetPlayer() == nil then
 				updateDetached(true)
-				updateBraindance(false)
-				updatePhotoMode(false)
 				updateSceneTier(1)
-				updateVehicle(false)
 				updateContext()
+				updateVehicle(false, false)
+				updateBraindance(false)
+				updateCyberspace(false)
+				updatePossessed(false)
+				updateFlashback(false)
+				updatePhotoMode(false)
 
 				if currentMenu ~= 'MainMenu' then
 					notifyObservers()
@@ -478,11 +561,11 @@ local function initialize(event)
 		}
 
 		for _, menuScenario  in pairs(menuOpenListeners) do
-			Observe(menuScenario, 'OnLeaveScenario', function(self, menuName)
+			Observe(menuScenario, 'OnLeaveScenario', function(_, menuName)
 				--spdlog.error(('%s::OnLeaveScenario()'):format(menuScenario))
 
 				if type(menuName) ~= 'userdata' then
-					menuName = self
+					menuName = _
 				end
 
 				updateMenuScenario(Game.NameToString(menuName))
@@ -495,7 +578,6 @@ local function initialize(event)
 
 		Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(menuItemData)
 			--spdlog.error(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
-			restoreEnvironment()
 
 			updateMenuItem(toStudlyCase(menuItemData.menuData.label))
 			notifyObservers()
@@ -596,10 +678,19 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
+		Observe('PlayerVisionModeController', 'OnRestrictedSceneChanged', function(sceneTierValue)
+			--spdlog.error(('PlayerVisionModeController::OnRestrictedSceneChanged(%d)'):format(sceneTierValue))
+
+			if isVehicle then
+				updateVehicle(true, sceneTierValue < 3)
+				notifyObservers()
+			end
+		end)
+
 		Observe('vehicleBaseObject', 'OnUnmountingEvent', function()
 			--spdlog.error(('vehicleBaseObject::OnUnmountingEvent()'))
 
-			updateVehicle(false)
+			updateVehicle(false, false)
 			notifyObservers()
 		end)
 
@@ -625,8 +716,9 @@ local function initialize(event)
 		Observe('PlayerVisionModeController', 'OnRestrictedSceneChanged', function(sceneTierValue)
 			--spdlog.error(('PlayerVisionModeController::OnRestrictedSceneChanged(%d)'):format(sceneTierValue))
 
-			updateSceneTier(sceneTierValue)
-			notifyObservers()
+			notifyAfterStart(function()
+				updateSceneTier(sceneTierValue)
+			end)
 		end)
 
 		initialized[GameUI.Event.Scene] = true
@@ -691,11 +783,24 @@ local function initialize(event)
 		initialized[GameUI.Event.FastTravel] = true
 	end
 
+	-- Tutorial Listeners
+
+	if required[GameUI.Event.Tutorial] and not initialized[GameUI.Event.Tutorial] then
+		Observe('gameuiTutorialPopupGameController', 'PauseGame', function(_, tutorialActive)
+			--spdlog.error(('gameuiTutorialPopupGameController::PauseGame(%s)'):format(tostring(tutorialActive)))
+
+			updateTutorial(tutorialActive)
+			notifyObservers()
+		end)
+
+		initialized[GameUI.Event.Tutorial] = true
+	end
+
 	-- UI Context Listeners
 
 	if required[GameUI.Event.Context] and not initialized[GameUI.Event.Context] then
 		Observe('gameuiGameSystemUI', 'PushGameContext', function(_, newContext)
-			--spdlog.error(('GameSystemUI::PushGameContext(%q)'):format(tostring(newContext)))
+			--spdlog.error(('GameSystemUI::PushGameContext(%s)'):format(tostring(newContext)))
 
 			if isBraindance and newContext.value == GameUI.Context.Scanning.value then
 				return
@@ -706,7 +811,7 @@ local function initialize(event)
 		end)
 
 		Observe('gameuiGameSystemUI', 'PopGameContext', function(_, oldContext)
-			--spdlog.error(('GameSystemUI::PopGameContext(%q)'):format(tostring(oldContext)))
+			--spdlog.error(('GameSystemUI::PopGameContext(%s)'):format(tostring(oldContext)))
 
 			if isBraindance and oldContext.value == GameUI.Context.Scanning.value then
 				return
@@ -742,10 +847,63 @@ local function initialize(event)
 		initialized[GameUI.Event.Context] = true
 	end
 
+	-- Johnny
+
+	if required[GameUI.Event.Johnny] and not initialized[GameUI.Event.Johnny] then
+		Observe('cpPlayerSystem', 'OnLocalPlayerPossesionChanged', function(_, possession)
+			if type(possession) ~= 'userdata' then
+				possession = _
+			end
+
+			--spdlog.error(('cpPlayerSystem::OnLocalPlayerPossesionChanged(%s)'):format(tostring(possession)))
+
+			notifyAfterStart(function()
+				updatePossessed(possession.value == 'Johnny')
+			end)
+		end)
+
+		Observe('cpPlayerSystem', 'OnLocalPlayerChanged', function(player)
+			--spdlog.error(('cpPlayerSystem::OnLocalPlayerChanged(%s)'):format(tostring(player:IsJohnnyReplacer())))
+
+			notifyAfterStart(function()
+				updateFlashback(player:IsJohnnyReplacer())
+			end)
+		end)
+
+		initialized[GameUI.Event.Johnny] = true
+	end
+
+	-- Johnny
+
+	if required[GameUI.Event.Cyberspace] and not initialized[GameUI.Event.Cyberspace] then
+		Observe('PlayerPuppet', 'OnStatusEffectApplied', function(evt)
+			local applyCyberspacePresence = evt.staticData:GameplayTagsContains('CyberspacePresence')
+
+			if applyCyberspacePresence then
+				notifyAfterStart(function()
+					updateCyberspace(true)
+				end)
+			end
+		end)
+
+		Observe('PlayerPuppet', 'OnStatusEffectRemoved', function(evt)
+			local removeCyberspacePresence = evt.staticData:GameplayTagsContains('CyberspacePresence')
+
+			if removeCyberspacePresence then
+				notifyAfterStart(function()
+					updateCyberspace(false)
+				end)
+			end
+		end)
+
+		initialized[GameUI.Event.Cyberspace] = true
+	end
+
 	-- Initial state
 
 	if not initialized.state then
 		refreshCurrentState()
+		pushCurrentState()
 
 		initialized.state = true
 	end
@@ -806,6 +964,10 @@ function GameUI.IsMainMenu()
 	return isMenu and currentMenu == 'MainMenu'
 end
 
+function GameUI.IsTutorial()
+	return isTutorial
+end
+
 function GameUI.IsScene()
 	return sceneTier >= 3 and not GameUI.IsMainMenu()
 end
@@ -844,12 +1006,28 @@ function GameUI.IsVehicle()
 	return isVehicle
 end
 
+function GameUI.IsFastTravel()
+	return isFastTravel
+end
+
 function GameUI.IsBraindance()
 	return isBraindance
 end
 
-function GameUI.IsFastTravel()
-	return isFastTravel
+function GameUI.IsCyberspace()
+	return isCyberspace
+end
+
+function GameUI.IsJohnny()
+	return isPossessed or isFlashback
+end
+
+function GameUI.IsPossessed()
+	return isPossessed
+end
+
+function GameUI.IsFlashback()
+	return isFlashback
 end
 
 function GameUI.IsPhoto()
@@ -857,8 +1035,14 @@ function GameUI.IsPhoto()
 end
 
 function GameUI.IsDefault()
-	return not isDetached and not isLoading and not isMenu and not isPhotoMode
-		and not isBraindance and not isFastTravel and not GameUI.IsScene()
+	return not isDetached
+		and not isLoading
+		and not isMenu
+		and not GameUI.IsScene()
+		and not isFastTravel
+		and not isBraindance
+		and not isCyberspace
+		and not isPhotoMode
 		and GameUI.IsContext(GameUI.Context.Default)
 end
 
@@ -890,23 +1074,40 @@ function GameUI.GetState()
 	currentState.isLoaded = isLoaded
 
 	currentState.isMenu = GameUI.IsMenu()
+	currentState.isTutorial = GameUI.IsTutorial()
+
 	currentState.isScene = GameUI.IsScene()
-	currentState.isVehicle = GameUI.IsVehicle()
-	currentState.isBraindance = GameUI.IsBraindance()
-	currentState.isFastTravel = GameUI.IsFastTravel()
 	currentState.isScanner = GameUI.IsScanner()
 	currentState.isQuickHack = GameUI.IsQuickHack()
 	currentState.isPopup = GameUI.IsPopup()
 	currentState.isWheel = GameUI.IsWheel()
 	currentState.isDevice = GameUI.IsDevice()
+	currentState.isVehicle = GameUI.IsVehicle()
+
+	currentState.isFastTravel = GameUI.IsFastTravel()
+
+	currentState.isBraindance = GameUI.IsBraindance()
+	currentState.isCyberspace = GameUI.IsCyberspace()
+
+	currentState.isJohnny = GameUI.IsJohnny()
+	currentState.isPossessed = GameUI.IsPossessed()
+	currentState.isFlashback = GameUI.IsFlashback()
+
 	currentState.isPhoto = GameUI.IsPhoto()
 
-	currentState.isDefault = not currentState.isDetached and not currentState.isLoading
-		and not currentState.isMenu and not currentState.isScene
-		and not currentState.isBraindance and not currentState.isFastTravel
-		and not currentState.isScanner and not currentState.isQuickHack
-		and not currentState.isPopup and not currentState.isWheel
-		and not currentState.isDevice and not currentState.isPhoto
+	currentState.isDefault = not currentState.isDetached
+		and not currentState.isLoading
+		and not currentState.isMenu
+		and not currentState.isScene
+		and not currentState.isScanner
+		and not currentState.isQuickHack
+		and not currentState.isPopup
+		and not currentState.isWheel
+		and not currentState.isDevice
+		and not currentState.isFastTravel
+		and not currentState.isBraindance
+		and not currentState.isCyberspace
+		and not currentState.isPhoto
 
 	currentState.menu = GameUI.GetMenu()
 	currentState.submenu = GameUI.GetSubmenu()
@@ -972,12 +1173,6 @@ function GameUI.PrintState(state)
 end
 
 GameUI.On = GameUI.Listen
-
---for event, _ in pairs(GameUI.Event) do
---	GameUI['On' .. event] = function(callback)
---		GameUI.Listen(event, callback)
---	end
---end
 
 setmetatable(GameUI, {
 	__index = function(_, key)

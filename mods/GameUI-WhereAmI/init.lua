@@ -53,7 +53,7 @@ registerForEvent('onInit', function()
 	end)
 
 	GameUI.Observe(function(state)
-		WhereAmI.Toggle(state.isDefault)
+		WhereAmI.Toggle(state.isDefault and not state.isJohnny)
 	end)
 end)
 
