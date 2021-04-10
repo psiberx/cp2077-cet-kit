@@ -18,8 +18,6 @@ end)
 
 local GameUI = { version = '1.0.3' }
 
-function restoreEnvironment() end
-
 GameUI.Event = {
 	Braindance = 'Braindance',
 	BraindanceEnter = 'BraindanceEnter',
@@ -329,6 +327,20 @@ local function refreshCurrentState()
 	end
 end
 
+local function pushCurrentState()
+	previousState = GameUI.GetState()
+end
+
+local function applyQueuedChanges()
+	if #updateQueue > 0 then
+		for _, updateCallback in ipairs(updateQueue) do
+			updateCallback()
+		end
+
+		updateQueue = {}
+	end
+end
+
 local function determineEvents(currentState)
 	local events = { GameUI.Event.Update }
 	local firing = {}
@@ -378,10 +390,8 @@ local function determineEvents(currentState)
 end
 
 local function notifyObservers()
-	if not isDetached and #updateQueue > 0 then
-		for i = #updateQueue, 1, -1 do
-			table.remove(updateQueue, i)()
-		end
+	if not isDetached then
+		applyQueuedChanges()
 	end
 
 	local currentState = GameUI.GetState()
@@ -429,10 +439,6 @@ local function notifyAfterStart(updateCallback)
 	else
 		table.insert(updateQueue, updateCallback)
 	end
-end
-
-local function pushCurrentState()
-	previousState = GameUI.GetState()
 end
 
 local function initialize(event)
@@ -486,6 +492,7 @@ local function initialize(event)
 				updateLoading(false)
 				updateLoaded(true)
 				updateMenuScenario()
+				applyQueuedChanges()
 				refreshCurrentState()
 				notifyObservers()
 			end
@@ -571,7 +578,6 @@ local function initialize(event)
 
 		Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(menuItemData)
 			--spdlog.error(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
-			restoreEnvironment()
 
 			updateMenuItem(toStudlyCase(menuItemData.menuData.label))
 			notifyObservers()
