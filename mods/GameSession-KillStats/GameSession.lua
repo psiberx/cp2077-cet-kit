@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.7' }
+local GameSession = { version = '1.0.8' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -88,11 +88,15 @@ local stateProps = {
 local previousState = {}
 
 local function updateLoaded(loaded)
+	local changed = isLoaded ~= loaded
+
 	isLoaded = loaded
+
+	return changed
 end
 
 local function updatePaused(isMenuActive)
-	isPaused = isMenuActive
+	isPaused = not isLoaded or isMenuActive
 end
 
 local function updateBlurred(isBlurActive)
@@ -363,14 +367,26 @@ local function initialize(event)
 	-- Session State
 
 	if required[GameSession.Scope.Session] and not initialized[GameSession.Scope.Session] then
-		Observe('RadialWheelController', 'RegisterBlackboards', function(_, loaded)
-			--spdlog.error(('RadialWheelController::RegisterBlackboards(%s)'):format(tostring(loaded)))
+		Observe('QuestTrackerGameController', 'OnInitialize', function()
+			--spdlog.error(('QuestTrackerGameController::OnInitialize()'))
 
-			updateLoaded(loaded)
-			updatePaused(false)
-			updateBlurred(false)
-			updateDead(false)
-			notifyObservers()
+			if updateLoaded(true) then
+				updatePaused(false)
+				updateBlurred(false)
+				updateDead(false)
+				notifyObservers()
+			end
+		end)
+
+		Observe('PlayerPuppet', 'OnDetach', function()
+			--spdlog.error(('PlayerPuppet::OnDetach()'))
+
+			if updateLoaded(false) then
+				updatePaused(true)
+				updateBlurred(false)
+				updateDead(false)
+				notifyObservers()
+			end
 		end)
 
 		initialized[GameSession.Scope.Session] = true
@@ -379,8 +395,8 @@ local function initialize(event)
 	-- Pause State
 
 	if required[GameSession.Scope.Pause] and not initialized[GameSession.Scope.Pause] then
-		Observe('RadialWheelController', 'OnIsInMenuChanged', function(isInMenu)
-			--spdlog.error(('RadialWheelController::OnIsInMenuChanged(%s)'):format(tostring(isInMenu)))
+		Observe('gameuiPopupsManager', 'OnMenuUpdate', function(isInMenu)
+			--spdlog.error(('gameuiPopupsManager::OnMenuUpdate(%s)'):format(tostring(isInMenu)))
 
 			updatePaused(isInMenu)
 			notifyObservers()

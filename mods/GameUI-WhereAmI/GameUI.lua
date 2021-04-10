@@ -16,7 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.0.1' }
+local GameUI = { version = '1.0.2' }
 
 function restoreEnvironment() end
 
@@ -227,23 +227,18 @@ end
 local function updateContext(oldContext, newContext)
 	if oldContext == nil and newContext == nil then
 		contextStack = {}
-	else
-		local position = #contextStack + 1
-
-		if oldContext ~= nil then
-			for i = #contextStack, 1, -1 do
-				if contextStack[i].value == oldContext.value then
-					table.remove(contextStack, i)
-					position = i
-					break
-				end
+	elseif oldContext == nil then
+		table.insert(contextStack, newContext)
+	elseif newContext == nil then
+		for i = #contextStack, 1, -1 do
+			if contextStack[i].value == oldContext.value then
+				table.remove(contextStack, i)
+				break
 			end
 		end
-
-		if newContext ~= nil then
-			if contextStack[position] ~= newContext then
-				table.insert(contextStack, position, newContext)
-			end
+	else
+		if #contextStack > 0 and contextStack[#contextStack].value == oldContext.value then
+			contextStack[#contextStack] = newContext
 		end
 	end
 end
@@ -407,26 +402,32 @@ local function initialize(event)
 	-- Game Session Listeners
 
 	if required[GameUI.Event.Session] and not initialized[GameUI.Event.Session] then
-		Observe('RadialWheelController', 'RegisterBlackboards', function(_, loaded)
-			--spdlog.error(('RadialWheelController::RegisterBlackboards(%s)'):format(tostring(loaded)))
+		Observe('QuestTrackerGameController', 'OnInitialize', function()
+			--spdlog.error(('QuestTrackerGameController::OnInitialize()'))
 
-			if loaded then
+			if isDetached then
 				updateLoading(false)
 				updateLoaded(true)
 				updateMenuScenario()
 				refreshCurrentState()
 				notifyObservers()
-			else
-				updateDetached(true)
-				updateBraindance(false)
-				updatePhotoMode(false)
-				updateContext()
+			end
+		end)
 
-				if currentMenu ~= 'MainMenu' then
-					notifyObservers()
-				else
-					pushCurrentState()
-				end
+		Observe('PlayerPuppet', 'OnDetach', function()
+			--spdlog.error(('PlayerPuppet::OnDetach()'))
+
+			updateDetached(true)
+			updateBraindance(false)
+			updatePhotoMode(false)
+			updateSceneTier(1)
+			updateVehicle(false)
+			updateContext()
+
+			if currentMenu ~= 'MainMenu' then
+				notifyObservers()
+			else
+				pushCurrentState()
 			end
 		end)
 
@@ -570,9 +571,6 @@ local function initialize(event)
 			--spdlog.error(('SingleplayerMenuGameController::OnSavesReady()'))
 
 			updateMenuScenario('MenuScenario_SingleplayerMenu')
-			updateBraindance(false)
-			updatePhotoMode(false)
-			updateSceneTier(4)
 
 			if not isLoading then
 				notifyObservers()
@@ -592,8 +590,8 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
-		Observe('hudCarController', 'OnUnmountingEvent', function()
-			--spdlog.error(('hudCarController::OnUnmountingEvent()'))
+		Observe('vehicleBaseObject', 'OnUnmountingEvent', function()
+			--spdlog.error(('vehicleBaseObject::OnUnmountingEvent()'))
 
 			updateVehicle(false)
 			notifyObservers()
@@ -618,8 +616,8 @@ local function initialize(event)
 	-- Scene State Listeners
 
 	if required[GameUI.Event.Scene] and not initialized[GameUI.Event.Scene] then
-		Observe('CrosshairGameController_NoWeapon', 'OnPSMSceneTierChanged', function(sceneTierValue)
-			--spdlog.error(('CrosshairGameController_NoWeapon::OnPSMSceneTierChanged(%d)'):format(sceneTierValue))
+		Observe('PlayerVisionModeController', 'OnRestrictedSceneChanged', function(sceneTierValue)
+			--spdlog.error(('PlayerVisionModeController::OnRestrictedSceneChanged(%d)'):format(sceneTierValue))
 
 			updateSceneTier(sceneTierValue)
 			notifyObservers()
@@ -803,7 +801,7 @@ function GameUI.IsMainMenu()
 end
 
 function GameUI.IsScene()
-	return sceneTier > 2 and not GameUI.IsMainMenu()
+	return sceneTier >= 3 and not GameUI.IsMainMenu()
 end
 
 function GameUI.IsScanner()
