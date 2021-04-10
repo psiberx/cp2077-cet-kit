@@ -18,7 +18,7 @@ Track game UI state reactively. Doesn't use recurrent `onUpdate` checks.
  
 Current detections:
  
-- Game Session (New Game, Load Game, Exit to Main Menu)
+- Session (New Game, Load Game, Exit to Main Menu)
 - Menus
   * Main Menu (Load Game, Settings, Credits)
   * New Game (Difficulty, Life Path, Body Type, Customization, Attributes, Summary)
@@ -30,22 +30,20 @@ Current detections:
   * Fast Travel
   * Stash
 - Loading Screen
-- Scenes (Cutscenes, Dialogs, Mirrors)
+- Fast Travel
+- Scenes (Cinematics, Limited Gameplay)
+- Vehicle (First Person, Third Person)
 - Scanning with Kiroshi Optics
 - Quickhacking with Cyberdeck
 - Devices (Computers, Terminals)
 - Popups (Phone, Call Vehicle)
 - Weapon Wheel
 - Braindance (Playback, Editing)
-- Vehicle (First Person, Third Person)
-- Fast Travel
+- Cyberspace
+- Johnny's Takeovers
+- Johnny's Memories
 - Photo Mode
-
-Todo:
-
-- Virtual Reality
-- Johnny's memories and takeovers 
-- Visibility of individual HUD elements 
+- Tutorials
 
 You can display own HUD elements and apply contextual logic depending on the current UI.
 
@@ -58,8 +56,8 @@ Current detections:
 - Session Start (New Game, Load Game)
 - Session End (Load Game, Exit to Main Menu)
 - Saving and Loading (Manual Save, Quick Save, Auto Save)
-- Pause State (All Menus)
-- Blur State (Weapon Wheel, Phone, Call Vehicle)
+- Pause State (All Menus, Tutorials)
+- Blur State (Weapon Wheel, Call Vehicle, Phone)
 - Death State
 
 This module can be used to efficiently detect when a player 
@@ -75,6 +73,10 @@ for storing its internal state.
 Manage game settings. 
 You can get and set current values, get option lists, 
 and export all settings as a table or to a file.
+
+### `GameHUD.lua` 
+
+Show in-game messages.
 
 ## How to use
 
