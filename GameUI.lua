@@ -57,6 +57,9 @@ GameUI.Event = {
 	Session = 'Session',
 	SessionEnd = 'SessionEnd',
 	SessionStart = 'SessionStart',
+	Tutorial = 'Tutorial',
+	TutorialClose = 'TutorialClose',
+	TutorialOpen = 'TutorialOpen',
 	Update = 'Update',
 	Vehicle = 'Vehicle',
 	VehicleEnter = 'VehicleEnter',
@@ -79,6 +82,7 @@ GameUI.StateEvent = {
 	[GameUI.Event.Scanner] = GameUI.Event.Scanner,
 	[GameUI.Event.Scene] = GameUI.Event.Scene,
 	[GameUI.Event.Session] = GameUI.Event.Session,
+	[GameUI.Event.Tutorial] = GameUI.Event.Tutorial,
 	[GameUI.Event.Update] = GameUI.Event.Update,
 	[GameUI.Event.Vehicle] = GameUI.Event.Vehicle,
 	[GameUI.Event.Wheel] = GameUI.Event.Wheel,
@@ -105,6 +109,7 @@ local isVehicle = false
 local isBraindance = false
 local isFastTravel = false
 local isPhotoMode = false
+local isTutorial = false
 local sceneTier = 4
 local currentMenu = false
 local currentSubmenu = false
@@ -127,6 +132,7 @@ local stateProps = {
 	{ current = 'isWheel', previous = 'wasWheel', event = { change = GameUI.Event.Wheel, on = GameUI.Event.WheelOpen, off = GameUI.Event.WheelClose, scope = GameUI.Event.Context } },
 	{ current = 'isDevice', previous = 'wasDevice', event = { change = GameUI.Event.Device, on = GameUI.Event.DeviceEnter, off = GameUI.Event.DeviceExit, scope = GameUI.Event.Context } },
 	{ current = 'isPhoto', previous = 'wasPhoto', event = { change = GameUI.Event.PhotoMode, on = GameUI.Event.PhotoModeOpen, off = GameUI.Event.PhotoModeClose } },
+	{ current = 'isTutorial', previous = 'wasTutorial', event = { change = GameUI.Event.Tutorial, on = GameUI.Event.TutorialOpen, off = GameUI.Event.TutorialClose } },
 	{ current = 'menu', previous = 'lastMenu', event = { change = GameUI.Event.MenuNav, reqs = { isMenu = true, wasMenu = true }, scope = GameUI.Event.Menu } },
 	{ current = 'submenu', previous = 'lastSubmenu', event = { change = GameUI.Event.MenuNav, reqs = { isMenu = true, wasMenu = true }, scope = GameUI.Event.Menu } },
 	{ current = 'camera', previous = 'lastCamera', event = { change = GameUI.Event.Camera, scope = GameUI.Event.Vehicle }, parent = 'isVehicle' },
@@ -220,8 +226,12 @@ local function updatePhotoMode(photoModeActive)
 	isPhotoMode = photoModeActive
 end
 
+local function updateTutorial(tutorialActive)
+	isTutorial = tutorialActive
+end
+
 local function updateSceneTier(sceneTierValue)
-	sceneTier = sceneTierValue -- gamePSMHighLevel?
+	sceneTier = sceneTierValue
 end
 
 local function updateContext(oldContext, newContext)
@@ -257,6 +267,7 @@ local function refreshCurrentState()
 	updateBraindance(blackboardBD:GetBool(blackboardDefs.Braindance.IsActive))
 	updatePhotoMode(blackboardPM:GetBool(blackboardDefs.PhotoMode.IsActive))
 	updateSceneTier(blackboardPSM:GetInt(blackboardDefs.PlayerStateMachine.SceneTier))
+	updateTutorial(Game.GetTimeSystem():IsTimeDilationActive('UI_TutorialPopup'))
 
 	if not isLoaded then
 		updateDetached(GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame())
@@ -266,8 +277,12 @@ local function refreshCurrentState()
 		end
 	end
 
-	if isBraindance and #contextStack == 0 then
-		updateContext(nil, GameUI.Context.BraindancePlayback)
+	if #contextStack == 0 then
+		if isBraindance then
+			updateContext(nil, GameUI.Context.BraindancePlayback)
+		elseif Game.GetTimeSystem():IsTimeDilationActive('radial') then
+			updateContext(nil, GameUI.Context.ModalPopup)
+		end
 	end
 end
 
@@ -691,6 +706,26 @@ local function initialize(event)
 		initialized[GameUI.Event.FastTravel] = true
 	end
 
+	-- Tutorial Listeners
+
+	if required[GameUI.Event.Tutorial] and not initialized[GameUI.Event.Tutorial] then
+		Observe('gameuiTutorialPopupGameController', 'OnInitialize', function()
+			--spdlog.error(('gameuiTutorialPopupGameController::OnInitialize()'))
+
+			updateTutorial(true)
+			notifyObservers()
+		end)
+
+		Observe('gameuiTutorialPopupGameController', 'OnUninitialize', function()
+			--spdlog.error(('gameuiTutorialPopupGameController::OnUninitialize()'))
+
+			updateTutorial(false)
+			notifyObservers()
+		end)
+
+		initialized[GameUI.Event.Tutorial] = true
+	end
+
 	-- UI Context Listeners
 
 	if required[GameUI.Event.Context] and not initialized[GameUI.Event.Context] then
@@ -856,6 +891,10 @@ function GameUI.IsPhoto()
 	return isPhotoMode
 end
 
+function GameUI.IsTutorial()
+	return isTutorial
+end
+
 function GameUI.IsDefault()
 	return not isDetached and not isLoading and not isMenu and not isPhotoMode
 		and not isBraindance and not isFastTravel and not GameUI.IsScene()
@@ -900,6 +939,7 @@ function GameUI.GetState()
 	currentState.isWheel = GameUI.IsWheel()
 	currentState.isDevice = GameUI.IsDevice()
 	currentState.isPhoto = GameUI.IsPhoto()
+	currentState.isTutorial = GameUI.IsTutorial()
 
 	currentState.isDefault = not currentState.isDetached and not currentState.isLoading
 		and not currentState.isMenu and not currentState.isScene
@@ -972,12 +1012,6 @@ function GameUI.PrintState(state)
 end
 
 GameUI.On = GameUI.Listen
-
---for event, _ in pairs(GameUI.Event) do
---	GameUI['On' .. event] = function(callback)
---		GameUI.Listen(event, callback)
---	end
---end
 
 setmetatable(GameUI, {
 	__index = function(_, key)
