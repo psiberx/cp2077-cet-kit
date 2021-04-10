@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.0.9' }
+local GameSession = { version = '1.1.0' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -111,8 +111,9 @@ local function refreshCurrentState()
 	local player = Game.GetPlayer()
 	local blackboardDefs = Game.GetAllBlackboardDefs()
 	local blackboardUI = Game.GetBlackboardSystem():Get(blackboardDefs.UI_System)
+	local tutorialActive = Game.GetTimeSystem():IsTimeDilationActive('UI_TutorialPopup')
 
-	updatePaused(blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu))
+	updatePaused(blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu) or tutorialActive)
 	updateBlurred(blackboardUI:GetBool(blackboardDefs.UI_System.CircularBlurEnabled))
 	updateDead(player:IsDeadNoStatPool())
 
@@ -401,6 +402,20 @@ local function initialize(event)
 			--spdlog.error(('gameuiPopupsManager::OnMenuUpdate(%s)'):format(tostring(isInMenu)))
 
 			updatePaused(isInMenu)
+			notifyObservers()
+		end)
+
+		Observe('gameuiTutorialPopupGameController', 'OnInitialize', function()
+			--spdlog.error(('gameuiTutorialPopupGameController::OnInitialize()'))
+
+			updatePaused(true)
+			notifyObservers()
+		end)
+
+		Observe('gameuiTutorialPopupGameController', 'OnUninitialize', function()
+			--spdlog.error(('gameuiTutorialPopupGameController::OnUninitialize()'))
+
+			updatePaused(false)
 			notifyObservers()
 		end)
 
