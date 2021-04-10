@@ -469,6 +469,10 @@ local function initialize(event)
 			end
 		end
 
+		Observe('PhoneMessagePopupGameController', 'SetTimeDilatation', function(_, popupActive)
+			updateBlurred(popupActive)
+		end)
+
 		initialized[GameSession.Scope.Blur] = true
 	end
 
