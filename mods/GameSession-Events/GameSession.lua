@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.1.0' }
+local GameSession = { version = '1.1.1' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -111,15 +111,20 @@ local function refreshCurrentState()
 	local player = Game.GetPlayer()
 	local blackboardDefs = Game.GetAllBlackboardDefs()
 	local blackboardUI = Game.GetBlackboardSystem():Get(blackboardDefs.UI_System)
-	local tutorialActive = Game.GetTimeSystem():IsTimeDilationActive('UI_TutorialPopup')
+	local blackboardPM = Game.GetBlackboardSystem():Get(blackboardDefs.PhotoMode)
 
-	updatePaused(blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu) or tutorialActive)
-	updateBlurred(blackboardUI:GetBool(blackboardDefs.UI_System.CircularBlurEnabled))
-	updateDead(player:IsDeadNoStatPool())
+	local menuActive = blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu)
+	local blurActive = blackboardUI:GetBool(blackboardDefs.UI_System.CircularBlurEnabled)
+	local photoModeActive = blackboardPM:GetBool(blackboardDefs.PhotoMode.IsActive)
+	local tutorialActive = Game.GetTimeSystem():IsTimeDilationActive('UI_TutorialPopup')
 
 	if not isLoaded then
 		updateLoaded(player:IsAttached() and not GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame())
 	end
+
+	updatePaused(menuActive or photoModeActive or tutorialActive)
+	updateBlurred(blurActive)
+	updateDead(player:IsDeadNoStatPool())
 end
 
 local function determineEvents(currentState)
@@ -401,10 +406,28 @@ local function initialize(event)
 	-- Pause State
 
 	if required[GameSession.Scope.Pause] and not initialized[GameSession.Scope.Pause] then
+		local fastTravelActive, fastTravelStart
+
 		Observe('gameuiPopupsManager', 'OnMenuUpdate', function(isInMenu)
 			--spdlog.error(('gameuiPopupsManager::OnMenuUpdate(%s)'):format(tostring(isInMenu)))
 
-			updatePaused(isInMenu)
+			if not fastTravelActive then
+				updatePaused(isInMenu)
+				notifyObservers()
+			end
+		end)
+
+		Observe('gameuiPhotoModeMenuController', 'OnShow', function()
+			--spdlog.error(('PhotoModeMenuController::OnShow()'))
+
+			updatePaused(true)
+			notifyObservers()
+		end)
+
+		Observe('gameuiPhotoModeMenuController', 'OnHide', function()
+			--spdlog.error(('PhotoModeMenuController::OnHide()'))
+
+			updatePaused(false)
 			notifyObservers()
 		end)
 
@@ -413,6 +436,37 @@ local function initialize(event)
 
 			updatePaused(tutorialActive)
 			notifyObservers()
+		end)
+
+		Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(request)
+			--spdlog.error(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
+
+			if request.isEnabled then
+				fastTravelStart = request.pointRecord
+			end
+		end)
+
+		Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(request)
+			--spdlog.error(('FastTravelSystem::OnPerformFastTravelRequest()'))
+
+			local fastTravelDestination = request.pointData.pointRecord
+
+			if tostring(fastTravelStart) ~= tostring(fastTravelDestination) then
+				fastTravelActive = true
+			else
+				fastTravelStart = nil
+			end
+		end)
+
+		Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(finished)
+			--spdlog.error(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
+
+			if finished then
+				fastTravelActive = false
+				fastTravelStart = nil
+				updatePaused(false)
+				notifyObservers()
+			end
 		end)
 
 		initialized[GameSession.Scope.Pause] = true
