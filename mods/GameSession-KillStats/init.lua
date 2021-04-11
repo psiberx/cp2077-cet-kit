@@ -8,6 +8,10 @@ local KillStats = {
 	lastKillTimestamp = nil,
 }
 
+function KillStats.IsPlayer(target)
+	return target and target:GetEntityID().hash == Game.GetPlayer():GetEntityID().hash
+end
+
 function KillStats.TrackKill(target)
 	local kill = {
 		confirmed = false,
@@ -15,24 +19,20 @@ function KillStats.TrackKill(target)
 		groups = nil,
 	}
 
-	if target.shouldDie and target.myKiller then
-		local player = Game.GetPlayer()
+	if target.shouldDie and (KillStats.IsPlayer(target.myKiller) or target.wasJustKilledOrDefeated) then
+		KillStats.totalKills = KillStats.totalKills + 1
+		KillStats.lastKillLocation = Game.GetPlayer():GetWorldPosition()
+		KillStats.lastKillTimestamp = Game.GetTimeSystem():GetGameTimeStamp()
 
-		if target.myKiller:GetEntityID().hash == player:GetEntityID().hash then
-			KillStats.totalKills = KillStats.totalKills + 1
-			KillStats.lastKillLocation = player:GetWorldPosition()
-			KillStats.lastKillTimestamp = Game.GetTimeSystem():GetGameTimeStamp()
+		local groups = KillStats.GetTargetGroups(target)
 
-			local groups = KillStats.GetTargetGroups(target)
-
-			for _, group in ipairs(groups) do
-				KillStats.totalKillsByGroup[group] = (KillStats.totalKillsByGroup[group] or 0) + 1
-			end
-
-			kill.confirmed = true
-			kill.number = KillStats.totalKills
-			kill.groups = groups
+		for _, group in ipairs(groups) do
+			KillStats.totalKillsByGroup[group] = (KillStats.totalKillsByGroup[group] or 0) + 1
 		end
+
+		kill.confirmed = true
+		kill.number = KillStats.totalKills
+		kill.groups = groups
 	end
 
 	return kill

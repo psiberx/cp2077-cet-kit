@@ -4,9 +4,13 @@ GameHUD.lua
 Copyright (c) 2021 psiberx
 ]]
 
-local GameHUD = { version = '0.1.1' }
+local GameHUD = { version = '0.2.0' }
 
 local messageController
+
+local function isVehicle()
+	return Game['GetMountedVehicle;GameObject'](Game.GetPlayer()) ~= nil
+end
 
 function GameHUD.Init()
 	Observe('OnscreenMessageGameController', 'CreateAnimations', function(self)
@@ -15,7 +19,7 @@ function GameHUD.Init()
 end
 
 function GameHUD.ShowMessage(text)
-	if messageController then
+	if messageController and not isVehicle() then
 		local message = NewObject('gameSimpleScreenMessage')
 		message.isShown = true
 		message.duration = 5.0

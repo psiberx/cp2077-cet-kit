@@ -16,7 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.1.1' }
+local GameUI = { version = '1.1.2' }
 
 GameUI.Event = {
 	Braindance = 'Braindance',
@@ -539,7 +539,7 @@ local function initialize(event)
 		end)
 
 		Observe('LoadingScreenProgressBarController', 'SetProgress', function(_, progress)
-			--spdlog.error(('LoadingScreenProgressBarController::SetProgress(%.3f)'):format(progress))
+			--spdlog.info(('LoadingScreenProgressBarController::SetProgress(%.3f)'):format(progress))
 
 			if progress == 1.0 then
 				if currentMenu ~= 'MainMenu' then
@@ -682,22 +682,25 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
+		Observe('hudCarController', 'OnUnmountingEvent', function()
+			--spdlog.error(('hudCarController::OnUnmountingEvent()'))
+
+			updateVehicle(false, false)
+			notifyObservers()
+		end)
+
+		Observe('gameuiPanzerHUDGameController', 'OnUninitialize', function()
+			--spdlog.error(('gameuiPanzerHUDGameController::OnUninitialize()'))
+
+			updateVehicle(false, false)
+			notifyObservers()
+		end)
+
 		Observe('PlayerVisionModeController', 'OnRestrictedSceneChanged', function(sceneTierValue)
 			--spdlog.error(('PlayerVisionModeController::OnRestrictedSceneChanged(%d)'):format(sceneTierValue))
 
 			if isVehicle then
 				updateVehicle(true, sceneTierValue < 3)
-				notifyObservers()
-			end
-		end)
-
-		Observe('vehicleBaseObject', 'OnUnmountingEvent', function(evt)
-			--spdlog.error(('vehicleBaseObject::OnUnmountingEvent()'))
-
-			local mountedObject = evt and evt.relationship and evt.relationship.otherObject
-
-			if mountedObject and mountedObject:IsA('PlayerPuppet') then
-				updateVehicle(false, false)
 				notifyObservers()
 			end
 		end)
