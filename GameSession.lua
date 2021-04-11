@@ -291,6 +291,10 @@ local function importSession(s)
 end
 
 local function writeSession(sessionName, sessionData)
+	if not sessionDataDir then
+		return
+	end
+
 	local sessionPath = sessionDataDir .. '/' .. sessionName .. '.lua'
 	local sessionFile = io.open(sessionPath, 'w')
 
@@ -304,6 +308,10 @@ local function writeSession(sessionName, sessionData)
 end
 
 local function readSession(sessionName)
+	if not sessionDataDir then
+		return nil
+	end
+
 	local sessionPath = sessionDataDir .. '/' .. sessionName .. '.lua'
 	local sessionChunk = loadfile(sessionPath)
 
@@ -320,12 +328,20 @@ local function readSession(sessionName)
 end
 
 local function removeSession(sessionName)
+	if not sessionDataDir then
+		return
+	end
+
 	local sessionPath = sessionDataDir .. '/' .. sessionName .. '.lua'
 
 	os.remove(sessionPath)
 end
 
 local function cleanUpSessions(sessionNames)
+	if not sessionDataDir then
+		return
+	end
+
 	local validNames = {}
 
 	for _, sessionName in ipairs(sessionNames) do
