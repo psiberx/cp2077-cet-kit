@@ -22,7 +22,6 @@ Track game UI state reactively. Doesn't use recurrent `onUpdate` checks.
  
 Current detections:
  
-- Session (New Game, Load Game, Exit to Main Menu)
 - Menus
   * Main Menu (Load Game, Settings, Credits)
   * New Game (Difficulty, Life Path, Body Type, Customization, Attributes, Summary)
@@ -33,21 +32,21 @@ Current detections:
   * Network Breach
   * Fast Travel
   * Stash
+- Tutorials
 - Loading Screen
-- Fast Travel
 - Scenes (Cinematics, Limited Gameplay)
-- Vehicle (First Person, Third Person)
+- Vehicles (First Person, Third Person)
 - Scanning with Kiroshi Optics
 - Quickhacking with Cyberdeck
 - Devices (Computers, Terminals)
 - Popups (Phone, Call Vehicle, Radio)
 - Weapon Wheel
+- Fast Travel
 - Braindance (Playback, Editing)
 - Cyberspace
 - Johnny's Takeovers
 - Johnny's Memories
 - Photo Mode
-- Tutorials
 
 You can display own HUD elements and apply contextual logic depending on the current UI.
 
