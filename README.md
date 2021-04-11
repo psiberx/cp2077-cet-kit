@@ -12,6 +12,10 @@ Right now only two type of tasks available: to run *after X secs* and to run *ev
 
 I plan to implement support of cron expressions and tie them to the time system of the game.
 
+### `GameHUD.lua` 
+
+Show in-game messages.
+
 ### `GameUI.lua` 
 
 Track game UI state reactively. Doesn't use recurrent `onUpdate` checks. 
@@ -36,7 +40,7 @@ Current detections:
 - Scanning with Kiroshi Optics
 - Quickhacking with Cyberdeck
 - Devices (Computers, Terminals)
-- Popups (Phone, Call Vehicle)
+- Popups (Phone, Call Vehicle, Radio)
 - Weapon Wheel
 - Braindance (Playback, Editing)
 - Cyberspace
@@ -56,8 +60,8 @@ Current detections:
 - Session Start (New Game, Load Game)
 - Session End (Load Game, Exit to Main Menu)
 - Saving and Loading (Manual Save, Quick Save, Auto Save)
-- Pause State (All Menus, Tutorials)
-- Blur State (Weapon Wheel, Call Vehicle, Phone)
+- Pause State (All Menus, Fast Travel, Photo Mode, Tutorials)
+- Blur State (Weapon Wheel, Phone, Call Vehicle, Radio)
 - Death State
 
 This module can be used to efficiently detect when a player 
@@ -73,10 +77,6 @@ for storing its internal state.
 Manage game settings. 
 You can get and set current values, get option lists, 
 and export all settings as a table or to a file.
-
-### `GameHUD.lua` 
-
-Show in-game messages.
 
 ## How to use
 
