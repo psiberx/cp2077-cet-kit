@@ -18,7 +18,7 @@ GameSession.Event = {
 	Update = 'Update',
 	Load = 'Load',
 	Save = 'Save',
-	List = 'List',
+	Clean = 'Clean',
 	LoadData = 'LoadData',
 	SaveData = 'SaveData',
 }
@@ -39,7 +39,7 @@ local eventScopes = {
 	[GameSession.Event.Update] = {},
 	[GameSession.Event.Load] = { [GameSession.Scope.Saves] = true },
 	[GameSession.Event.Save] = { [GameSession.Scope.Saves] = true },
-	[GameSession.Event.List] = { [GameSession.Scope.Saves] = true },
+	[GameSession.Event.Clean] = { [GameSession.Scope.Saves] = true },
 	[GameSession.Event.LoadData] = { [GameSession.Scope.Saves] = true, [GameSession.Scope.Persistence] = true },
 	[GameSession.Event.SaveData] = { [GameSession.Scope.Saves] = true, [GameSession.Scope.Persistence] = true },
 }
@@ -540,6 +540,8 @@ local function initialize(event)
 		end
 
 		Observe('PhoneMessagePopupGameController', 'SetTimeDilatation', function(_, popupActive)
+			--spdlog.error(('PhoneMessagePopupGameController::SetTimeDilatation()'))
+
 			updateBlurred(popupActive)
 			notifyObservers()
 		end)
@@ -551,6 +553,8 @@ local function initialize(event)
 
 	if required[GameSession.Scope.Death] and not initialized[GameSession.Scope.Death] then
 		Observe('PlayerPuppet', 'OnDeath', function()
+			--spdlog.error(('PlayerPuppet::OnDeath()'))
+
 			updateDead(true)
 			notifyObservers()
 		end)
@@ -586,7 +590,7 @@ local function initialize(event)
 				table.insert(timestamps, saveInfo.timestamp)
 			end
 
-			dispatchEvent(GameSession.Event.List, { timestamps = timestamps })
+			dispatchEvent(GameSession.Event.Clean, { timestamps = timestamps })
 
 			saveList = nil
 		end)
@@ -637,7 +641,7 @@ local function initialize(event)
 			end
 		end)
 
-		addEventListener(GameSession.Event.List, function(state)
+		addEventListener(GameSession.Event.Clean, function(state)
 			cleanUpSessions(state.timestamps)
 		end)
 
