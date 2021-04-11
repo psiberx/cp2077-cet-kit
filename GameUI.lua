@@ -16,11 +16,12 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.1.0' }
+local GameUI = { version = '1.1.1' }
 
 GameUI.Event = {
 	Braindance = 'Braindance',
-	BraindanceEnter = 'BraindanceEnter',
+	BraindancePlay = 'BraindancePlay',
+	BraindanceEdit = 'BraindanceEdit',
 	BraindanceExit = 'BraindanceExit',
 	Camera = 'Camera',
 	Context = 'Context',
@@ -139,7 +140,8 @@ local stateProps = {
 	{ current = 'isMenu', previous = 'wasMenu', event = { change = GameUI.Event.Menu, on = GameUI.Event.MenuOpen, off = GameUI.Event.MenuClose } },
 	{ current = 'isScene', previous = 'wasScene', event = { change = GameUI.Event.Scene, on = GameUI.Event.SceneEnter, off = GameUI.Event.SceneExit, reqs = { isMenu = false } } },
 	{ current = 'isVehicle', previous = 'wasVehicle', event = { change = GameUI.Event.Vehicle, on = GameUI.Event.VehicleEnter, off = GameUI.Event.VehicleExit } },
-	{ current = 'isBraindance', previous = 'wasBraindance', event = { change = GameUI.Event.Braindance, on = GameUI.Event.BraindanceEnter, off = GameUI.Event.BraindanceExit } },
+	{ current = 'isBraindance', previous = 'wasBraindance', event = { change = GameUI.Event.Braindance, on = GameUI.Event.BraindancePlay, off = GameUI.Event.BraindanceExit } },
+	{ current = 'isEditor', previous = 'wasEditor', event = { change = GameUI.Event.Braindance, on = GameUI.Event.BraindanceEdit, off = GameUI.Event.BraindancePlay } },
 	{ current = 'isFastTravel', previous = 'wasFastTravel', event = { change = GameUI.Event.FastTravel, on = GameUI.Event.FastTravelStart, off = GameUI.Event.FastTravelFinish } },
 	{ current = 'isJohnny', previous = 'wasJohnny', event = { change = GameUI.Event.Johnny } },
 	{ current = 'isPossessed', previous = 'wasPossessed', event = { change = GameUI.Event.Possession, on = GameUI.Event.PossessionStart, off = GameUI.Event.PossessionEnd, scope = GameUI.Event.Johnny } },
@@ -1095,6 +1097,7 @@ function GameUI.GetState()
 
 	currentState.isPhoto = GameUI.IsPhoto()
 
+	currentState.isEditor = GameUI.IsContext(GameUI.Context.BraindanceEditor)
 	currentState.isDefault = not currentState.isDetached
 		and not currentState.isLoading
 		and not currentState.isMenu
