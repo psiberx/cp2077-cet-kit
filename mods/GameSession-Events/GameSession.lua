@@ -350,21 +350,25 @@ local function initialize(event)
 	if not initialized.data then
 		for _, stateProp in ipairs(stateProps) do
 			if stateProp.event then
-				local eventScope = stateProp.event.scope or stateProp.event.change or stateProp.current
+				local eventScope = stateProp.event.scope or stateProp.event.change
 
-				for _, eventKey in ipairs({ 'change', 'on', 'off' }) do
-					local eventName = stateProp.event[eventKey]
+				if eventScope then
+					for _, eventKey in ipairs({ 'change', 'on', 'off' }) do
+						local eventName = stateProp.event[eventKey]
 
-					if eventName then
-						if not eventScopes[eventName] then
-							eventScopes[eventName] = {}
+						if eventName then
+							if not eventScopes[eventName] then
+								eventScopes[eventName] = {}
+							end
+
+							eventScopes[eventName][eventScope] = true
 						end
+					end
 
-						eventScopes[eventName][eventScope] = true
+					if eventScope ~= GameSession.Scope.Persistence then
+						eventScopes[GameSession.Event.Update][eventScope] = true
 					end
 				end
-
-				eventScopes[GameSession.Event.Update][eventScope] = true
 			end
 		end
 
@@ -549,11 +553,13 @@ local function initialize(event)
 
 		Observe('LoadGameMenuGameController', 'OnSaveMetadataReady', function(saveInfo)
 			saveList[saveInfo.saveIndex] = {
-				timestamp = tostring(saveInfo.timestamp):gsub('ULL$', '')
+				timestamp = tonumber(saveInfo.timestamp)
 			}
 		end)
 
 		Observe('LoadGameMenuGameController', 'LoadSaveInGame', function(_, saveIndex)
+			--spdlog.error(('LoadGameMenuGameController::LoadSaveInGame(%d)'):format(saveIndex))
+
 			local timestamp = saveList[saveIndex].timestamp
 
 			dispatchEvent(GameSession.Event.Load, { timestamp = timestamp })
@@ -570,6 +576,8 @@ local function initialize(event)
 		end)
 
 		Observe('gameuiInGameMenuGameController', 'OnSavingComplete', function(success)
+			--spdlog.error(('gameuiInGameMenuGameController::OnSavingComplete(%s)'):format(tostring(success)))
+
 			if success then
 				local timestamp = os.time()
 
@@ -582,7 +590,7 @@ local function initialize(event)
 
 	-- Persistence
 
-	if not initialized[GameSession.Scope.Persistence] then
+	if required[GameSession.Scope.Persistence] and not initialized[GameSession.Scope.Persistence] then
 		addEventListener(GameSession.Event.Save, function(state)
 			local sessionName = state.timestamp
 			local sessionData = sessionDataRef or {}
