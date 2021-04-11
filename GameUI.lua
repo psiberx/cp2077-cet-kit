@@ -296,6 +296,14 @@ local function refreshCurrentState()
 	local blackboardPM = Game.GetBlackboardSystem():Get(blackboardDefs.PhotoMode)
 	local blackboardPSM = Game.GetBlackboardSystem():GetLocalInstanced(player:GetEntityID(), blackboardDefs.PlayerStateMachine)
 
+	if not isLoaded then
+		updateDetached(not player:IsAttached() or GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame())
+
+		if isDetached then
+			currentMenu = 'MainMenu'
+		end
+	end
+
 	updateMenu(blackboardUI:GetBool(blackboardDefs.UI_System.IsInMenu))
 	updateTutorial(Game.GetTimeSystem():IsTimeDilationActive('UI_TutorialPopup'))
 
@@ -311,14 +319,6 @@ local function refreshCurrentState()
 	updateFlashback(player:IsJohnnyReplacer())
 
 	updatePhotoMode(blackboardPM:GetBool(blackboardDefs.PhotoMode.IsActive))
-
-	if not isLoaded then
-		updateDetached(GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame())
-
-		if isDetached then
-			currentMenu = 'MainMenu'
-		end
-	end
 
 	if #contextStack == 0 then
 		if isBraindance then
@@ -462,20 +462,22 @@ local function initialize(event)
 			if stateProp.event then
 				local eventScope = stateProp.event.scope or stateProp.event.change
 
-				for _, eventKey in ipairs({ 'change', 'on', 'off' }) do
-					local eventName = stateProp.event[eventKey]
+				if eventScope then
+					for _, eventKey in ipairs({ 'change', 'on', 'off' }) do
+						local eventName = stateProp.event[eventKey]
 
-					if eventName then
-						if not eventScopes[eventName] then
-							eventScopes[eventName] = {}
-							eventScopes[eventName][GameUI.Event.Session] = true
+						if eventName then
+							if not eventScopes[eventName] then
+								eventScopes[eventName] = {}
+								eventScopes[eventName][GameUI.Event.Session] = true
+							end
+
+							eventScopes[eventName][eventScope] = true
 						end
-
-						eventScopes[eventName][eventScope] = true
 					end
-				end
 
-				eventScopes[GameUI.Event.Update][eventScope] = true
+					eventScopes[GameUI.Event.Update][eventScope] = true
+				end
 			end
 		end
 
@@ -689,11 +691,15 @@ local function initialize(event)
 			end
 		end)
 
-		Observe('vehicleBaseObject', 'OnUnmountingEvent', function()
+		Observe('vehicleBaseObject', 'OnUnmountingEvent', function(evt)
 			--spdlog.error(('vehicleBaseObject::OnUnmountingEvent()'))
 
-			updateVehicle(false, false)
-			notifyObservers()
+			local mountedObject = evt and evt.relationship and evt.relationship.otherObject
+
+			if mountedObject and mountedObject:IsA('PlayerPuppet') then
+				updateVehicle(false, false)
+				notifyObservers()
+			end
 		end)
 
 		initialized[GameUI.Event.Vehicle] = true
@@ -1098,6 +1104,7 @@ function GameUI.GetState()
 	currentState.isPhoto = GameUI.IsPhoto()
 
 	currentState.isEditor = GameUI.IsContext(GameUI.Context.BraindanceEditor)
+
 	currentState.isDefault = not currentState.isDetached
 		and not currentState.isLoading
 		and not currentState.isMenu
