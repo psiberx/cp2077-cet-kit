@@ -278,6 +278,10 @@ function GameSettings.Reject()
 	Game.GetSettingsSystem():RejectChanges()
 end
 
+function GameSettings.Save()
+	GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():RequestSaveUserSettings()
+end
+
 function GameSettings.Export(isPreGame)
 	return module.exportVars(isPreGame)
 end
