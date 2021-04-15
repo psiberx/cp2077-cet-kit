@@ -56,3 +56,17 @@ registerHotkey('ToggleHUD', 'Toggle HUD', function()
 	--	'/interface/hud/stamina_oxygen',
 	--})
 end)
+
+registerHotkey('SwitchBlur', 'Switch blur', function()
+	local options, current = GameSettings.Options('/graphics/basic/MotionBlur')
+	local next = current + 1
+
+	if next > #options then
+		next = 1
+	end
+
+	GameSettings.Set('/graphics/basic/MotionBlur', options[next])
+	GameSettings.Save() -- Required for most graphics settings
+
+	print(('Switched blur from %s to %s'):format(options[current], options[next]))
+end)

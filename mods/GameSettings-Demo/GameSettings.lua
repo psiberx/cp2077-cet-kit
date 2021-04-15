@@ -5,7 +5,7 @@ Game Settings Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSettings = { version = '1.0.3' }
+local GameSettings = { version = '1.0.4' }
 
 local module = {}
 
@@ -276,6 +276,10 @@ end
 
 function GameSettings.Reject()
 	Game.GetSettingsSystem():RejectChanges()
+end
+
+function GameSettings.Save()
+	GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():RequestSaveUserSettings()
 end
 
 function GameSettings.Export(isPreGame)
