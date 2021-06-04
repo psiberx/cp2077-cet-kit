@@ -16,7 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.1.2' }
+local GameUI = { version = '1.1.3' }
 
 GameUI.Event = {
 	Braindance = 'Braindance',
@@ -66,6 +66,9 @@ GameUI.Event = {
 	Session = 'Session',
 	SessionEnd = 'SessionEnd',
 	SessionStart = 'SessionStart',
+	Shard = 'Shard',
+	ShardClose = 'ShardClose',
+	ShardOpen = 'ShardOpen',
 	Tutorial = 'Tutorial',
 	TutorialClose = 'TutorialClose',
 	TutorialOpen = 'TutorialOpen',
@@ -95,6 +98,7 @@ GameUI.StateEvent = {
 	[GameUI.Event.Scanner] = GameUI.Event.Scanner,
 	[GameUI.Event.Scene] = GameUI.Event.Scene,
 	[GameUI.Event.Session] = GameUI.Event.Session,
+	[GameUI.Event.Shard] = GameUI.Event.Shard,
 	[GameUI.Event.Tutorial] = GameUI.Event.Tutorial,
 	[GameUI.Event.Update] = GameUI.Event.Update,
 	[GameUI.Event.Vehicle] = GameUI.Event.Vehicle,
@@ -123,6 +127,7 @@ local isVehicle = false
 local isBraindance = false
 local isFastTravel = false
 local isPhotoMode = false
+local isShard = false
 local isTutorial = false
 local sceneTier = 4
 local isPossessed = false
@@ -154,6 +159,7 @@ local stateProps = {
 	{ current = 'isWheel', previous = 'wasWheel', event = { change = GameUI.Event.Wheel, on = GameUI.Event.WheelOpen, off = GameUI.Event.WheelClose, scope = GameUI.Event.Context } },
 	{ current = 'isDevice', previous = 'wasDevice', event = { change = GameUI.Event.Device, on = GameUI.Event.DeviceEnter, off = GameUI.Event.DeviceExit, scope = GameUI.Event.Context } },
 	{ current = 'isPhoto', previous = 'wasPhoto', event = { change = GameUI.Event.PhotoMode, on = GameUI.Event.PhotoModeOpen, off = GameUI.Event.PhotoModeClose } },
+	{ current = 'isShard', previous = 'wasShard', event = { change = GameUI.Event.Shard, on = GameUI.Event.ShardOpen, off = GameUI.Event.ShardClose } },
 	{ current = 'isTutorial', previous = 'wasTutorial', event = { change = GameUI.Event.Tutorial, on = GameUI.Event.TutorialOpen, off = GameUI.Event.TutorialClose } },
 	{ current = 'menu', previous = 'lastMenu', event = { change = GameUI.Event.MenuNav, reqs = { isMenu = true, wasMenu = true }, scope = GameUI.Event.Menu } },
 	{ current = 'submenu', previous = 'lastSubmenu', event = { change = GameUI.Event.MenuNav, reqs = { isMenu = true, wasMenu = true }, scope = GameUI.Event.Menu } },
@@ -246,6 +252,10 @@ end
 
 local function updatePhotoMode(photoModeActive)
 	isPhotoMode = photoModeActive
+end
+
+local function updateShard(shardActive)
+	isShard = shardActive
 end
 
 local function updateTutorial(tutorialActive)
@@ -794,6 +804,24 @@ local function initialize(event)
 		initialized[GameUI.Event.FastTravel] = true
 	end
 
+	-- Shard Listeners
+
+	if required[GameUI.Event.Shard] and not initialized[GameUI.Event.Shard] then
+		Observe('ShardNotificationController', 'SetButtonHints', function()
+			--spdlog.error(('ShardNotificationController::SetButtonHints()'))
+			updateShard(true)
+			notifyObservers()
+		end)
+
+		Observe('ShardNotificationController', 'Close', function()
+			--spdlog.error(('ShardNotificationController::Close()'))
+			updateShard(false)
+			notifyObservers()
+		end)
+
+		initialized[GameUI.Event.Shard] = true
+	end
+
 	-- Tutorial Listeners
 
 	if required[GameUI.Event.Tutorial] and not initialized[GameUI.Event.Tutorial] then
@@ -975,6 +1003,10 @@ function GameUI.IsMainMenu()
 	return isMenu and currentMenu == 'MainMenu'
 end
 
+function GameUI.IsShard()
+	return isShard
+end
+
 function GameUI.IsTutorial()
 	return isTutorial
 end
@@ -1085,6 +1117,7 @@ function GameUI.GetState()
 	currentState.isLoaded = isLoaded
 
 	currentState.isMenu = GameUI.IsMenu()
+	currentState.isShard = GameUI.IsShard()
 	currentState.isTutorial = GameUI.IsTutorial()
 
 	currentState.isScene = GameUI.IsScene()

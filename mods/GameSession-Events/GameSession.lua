@@ -568,10 +568,14 @@ local function initialize(event)
 		local saveList
 
 		Observe('LoadGameMenuGameController', 'OnSavesReady', function()
+			--spdlog.error(('LoadGameMenuGameController::OnSavesReady()'))
+
 			saveList = {}
 		end)
 
 		Observe('LoadGameMenuGameController', 'OnSaveMetadataReady', function(saveInfo)
+			--spdlog.error(('LoadGameMenuGameController::OnSaveMetadataReady()'))
+
 			saveList[saveInfo.saveIndex] = {
 				timestamp = tonumber(saveInfo.timestamp)
 			}
