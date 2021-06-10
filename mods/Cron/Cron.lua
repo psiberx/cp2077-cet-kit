@@ -5,9 +5,9 @@ Timed Tasks Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local Cron = {}
+local Cron = { version = '1.0.1' }
 
-local timers = { version = '1.0.1' }
+local timers = {}
 local counter = 0
 
 ---@param timeout number
