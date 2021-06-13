@@ -16,7 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.1.3' }
+local GameUI = { version = '1.1.4' }
 
 GameUI.Event = {
 	Braindance = 'Braindance',
@@ -576,11 +576,11 @@ local function initialize(event)
 
 		for _, menuScenario  in pairs(menuOpenListeners) do
 			Observe(menuScenario, 'OnLeaveScenario', function(_, menuName)
-				--spdlog.error(('%s::OnLeaveScenario()'):format(menuScenario))
-
 				if type(menuName) ~= 'userdata' then
 					menuName = _
 				end
+
+				--spdlog.error(('%s::OnLeaveScenario()'):format(menuScenario))
 
 				updateMenuScenario(Game.NameToString(menuName))
 
@@ -590,14 +590,18 @@ local function initialize(event)
 			end)
 		end
 
-		Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(menuItemData)
+		Observe('MenuScenario_HubMenu', 'OnSelectMenuItem', function(_, menuItemData)
+			if type(menuItemData) ~= 'userdata' then
+				menuItemData = _
+			end
+
 			--spdlog.error(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
 
 			updateMenuItem(toStudlyCase(menuItemData.menuData.label))
 			notifyObservers()
 		end)
 
-		Observe('MenuScenario_HubMenu', 'OnCloseHubMenu', function(_)
+		Observe('MenuScenario_HubMenu', 'OnCloseHubMenu', function()
 			--spdlog.error(('MenuScenario_HubMenu::OnCloseHubMenu()'))
 
 			updateMenuItem(false)
@@ -685,7 +689,11 @@ local function initialize(event)
 	-- Vehicle State Listeners
 
 	if required[GameUI.Event.Vehicle] and not initialized[GameUI.Event.Vehicle] then
-		Observe('hudCarController', 'OnCameraModeChanged', function(mode)
+		Observe('hudCarController', 'OnCameraModeChanged', function(_, mode)
+			if type(mode) ~= 'boolean' then
+				mode = _
+			end
+
 			--spdlog.error(('hudCarController::OnCameraModeChanged(%s)'):format(tostring(mode)))
 
 			updateVehicle(true, mode)
@@ -706,7 +714,11 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
-		Observe('PlayerVisionModeController', 'OnRestrictedSceneChanged', function(sceneTierValue)
+		Observe('PlayerVisionModeController', 'OnRestrictedSceneChanged', function(_, sceneTierValue)
+			if type(sceneTierValue) ~= 'number' then
+				sceneTierValue = _
+			end
+
 			--spdlog.error(('PlayerVisionModeController::OnRestrictedSceneChanged(%d)'):format(sceneTierValue))
 
 			if isVehicle then
@@ -721,7 +733,11 @@ local function initialize(event)
 	-- Braindance State Listeners
 
 	if required[GameUI.Event.Braindance] and not initialized[GameUI.Event.Braindance] then
-		Observe('BraindanceGameController', 'OnIsActiveUpdated', function(braindanceActive)
+		Observe('BraindanceGameController', 'OnIsActiveUpdated', function(_, braindanceActive)
+			if type(braindanceActive) ~= 'boolean' then
+				braindanceActive = _
+			end
+
 			--spdlog.error(('BraindanceGameController::OnIsActiveUpdated(%s)'):format(tostring(braindanceActive)))
 
 			updateBraindance(braindanceActive)
@@ -734,7 +750,11 @@ local function initialize(event)
 	-- Scene State Listeners
 
 	if required[GameUI.Event.Scene] and not initialized[GameUI.Event.Scene] then
-		Observe('PlayerVisionModeController', 'OnRestrictedSceneChanged', function(sceneTierValue)
+		Observe('PlayerVisionModeController', 'OnRestrictedSceneChanged', function(_, sceneTierValue)
+			if type(sceneTierValue) ~= 'number' then
+				sceneTierValue = _
+			end
+
 			--spdlog.error(('PlayerVisionModeController::OnRestrictedSceneChanged(%d)'):format(sceneTierValue))
 
 			notifyAfterStart(function()
@@ -770,7 +790,11 @@ local function initialize(event)
 	if required[GameUI.Event.FastTravel] and not initialized[GameUI.Event.FastTravel] then
 		local fastTravelStart
 
-		Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(request)
+		Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(_, request)
+			if type(request) ~= 'userdata' then
+				request = _
+			end
+
 			--spdlog.error(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
 
 			if request.isEnabled then
@@ -778,7 +802,11 @@ local function initialize(event)
 			end
 		end)
 
-		Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(request)
+		Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(_, request)
+			if type(request) ~= 'userdata' then
+				request = _
+			end
+
 			--spdlog.error(('FastTravelSystem::OnPerformFastTravelRequest()'))
 
 			local fastTravelDestination = request.pointData.pointRecord
@@ -790,7 +818,11 @@ local function initialize(event)
 			end
 		end)
 
-		Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(finished)
+		Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(_, finished)
+			if type(finished) ~= 'boolean' then
+				finished = _
+			end
+
 			--spdlog.error(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
 
 			if isFastTravel and finished then
@@ -864,7 +896,11 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
-		Observe('HUDManager', 'OnQuickHackUIVisibleChanged', function(quickhacking)
+		Observe('HUDManager', 'OnQuickHackUIVisibleChanged', function(_, quickhacking)
+			if type(quickhacking) ~= 'boolean' then
+				quickhacking = _
+			end
+
 			--spdlog.error(('HUDManager::OnQuickHackUIVisibleChanged(%s)'):format(tostring(quickhacking)))
 
 			if quickhacking then
@@ -901,7 +937,11 @@ local function initialize(event)
 			end)
 		end)
 
-		Observe('cpPlayerSystem', 'OnLocalPlayerChanged', function(player)
+		Observe('cpPlayerSystem', 'OnLocalPlayerChanged', function(_, player)
+			if type(player) ~= 'userdata' then
+				player = _
+			end
+
 			--spdlog.error(('cpPlayerSystem::OnLocalPlayerChanged(%s)'):format(tostring(player:IsJohnnyReplacer())))
 
 			notifyAfterStart(function()
@@ -915,7 +955,13 @@ local function initialize(event)
 	-- Johnny
 
 	if required[GameUI.Event.Cyberspace] and not initialized[GameUI.Event.Cyberspace] then
-		Observe('PlayerPuppet', 'OnStatusEffectApplied', function(evt)
+		Observe('PlayerPuppet', 'OnStatusEffectApplied', function(_, evt)
+			if type(evt) ~= 'userdata' then
+				evt = _
+			end
+
+			--spdlog.error(('PlayerPuppet::OnStatusEffectApplied()'))
+
 			local applyCyberspacePresence = evt.staticData:GameplayTagsContains('CyberspacePresence')
 
 			if applyCyberspacePresence then
@@ -925,7 +971,13 @@ local function initialize(event)
 			end
 		end)
 
-		Observe('PlayerPuppet', 'OnStatusEffectRemoved', function(evt)
+		Observe('PlayerPuppet', 'OnStatusEffectRemoved', function(_, evt)
+			if type(evt) ~= 'userdata' then
+				evt = _
+			end
+
+			--spdlog.error(('PlayerPuppet::OnStatusEffectRemoved()'))
+
 			local removeCyberspacePresence = evt.staticData:GameplayTagsContains('CyberspacePresence')
 
 			if removeCyberspacePresence then

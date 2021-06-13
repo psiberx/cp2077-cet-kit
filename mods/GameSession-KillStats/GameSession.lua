@@ -6,7 +6,7 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.1.1' }
+local GameSession = { version = '1.1.2' }
 
 GameSession.Event = {
 	Start = 'Start',
@@ -428,7 +428,11 @@ local function initialize(event)
 	if required[GameSession.Scope.Pause] and not initialized[GameSession.Scope.Pause] then
 		local fastTravelActive, fastTravelStart
 
-		Observe('gameuiPopupsManager', 'OnMenuUpdate', function(isInMenu)
+		Observe('gameuiPopupsManager', 'OnMenuUpdate', function(_, isInMenu)
+			if isInMenu == nil then
+				isInMenu = _
+			end
+
 			--spdlog.error(('gameuiPopupsManager::OnMenuUpdate(%s)'):format(tostring(isInMenu)))
 
 			if not fastTravelActive then
@@ -458,7 +462,11 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
-		Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(request)
+		Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(_, request)
+			if request == nil then
+				request = _
+			end
+
 			--spdlog.error(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
 
 			if request.isEnabled then
@@ -478,7 +486,11 @@ local function initialize(event)
 			end
 		end)
 
-		Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(finished)
+		Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(_, finished)
+			if finished == nil then
+				finished = _
+			end
+
 			--spdlog.error(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
 
 			if finished then
@@ -568,13 +580,13 @@ local function initialize(event)
 		local saveList
 
 		Observe('LoadGameMenuGameController', 'OnSavesReady', function()
-			--spdlog.error(('LoadGameMenuGameController::OnSavesReady()'))
-
 			saveList = {}
 		end)
 
-		Observe('LoadGameMenuGameController', 'OnSaveMetadataReady', function(saveInfo)
-			--spdlog.error(('LoadGameMenuGameController::OnSaveMetadataReady()'))
+		Observe('LoadGameMenuGameController', 'OnSaveMetadataReady', function(_, saveInfo)
+			if saveInfo == nil then
+				saveInfo = _
+			end
 
 			saveList[saveInfo.saveIndex] = {
 				timestamp = tonumber(saveInfo.timestamp)
@@ -599,7 +611,11 @@ local function initialize(event)
 			saveList = nil
 		end)
 
-		Observe('gameuiInGameMenuGameController', 'OnSavingComplete', function(success)
+		Observe('gameuiInGameMenuGameController', 'OnSavingComplete', function(_, success)
+			if type(success) ~= 'boolean' then
+				success = _
+			end
+
 			--spdlog.error(('gameuiInGameMenuGameController::OnSavingComplete(%s)'):format(tostring(success)))
 
 			if success then
