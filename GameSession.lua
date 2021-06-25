@@ -6,7 +6,10 @@ Persistent Session Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local GameSession = { version = '1.1.2' }
+local GameSession = {
+	version = '1.2.0',
+	framework = '1.13.0'
+}
 
 GameSession.Event = {
 	Start = 'Start',
@@ -44,6 +47,28 @@ local eventScopes = {
 	[GameSession.Event.SaveData] = { [GameSession.Scope.Saves] = true, [GameSession.Scope.Persistence] = true },
 }
 
+local isLoaded = false
+local isPaused = true
+local isBlurred = false
+local isDead = false
+
+local sessionDataDir
+local sessionDataRef
+local sessionDataTmpl
+local sessionDataRelaxed = false
+
+local sessionKeyValue = 0
+local sessionKeyFactName = '_psxgs_session_key'
+
+-- Error Handling --
+
+local function raiseError(msg)
+	print('[GameSession] ' .. msg)
+	error(msg, 2)
+end
+
+-- Event Dispatching --
+
 local function addEventListener(event, callback)
 	if not listeners[event] then
 		listeners[event] = {}
@@ -64,17 +89,7 @@ local function dispatchEvent(event, state)
 	end
 end
 
-local function raiseError(msg)
-	print('[GameSession] ' .. msg)
-	error(msg, 2)
-end
-
--- State Observing
-
-local isLoaded = false
-local isPaused = true
-local isBlurred = false
-local isDead = false
+-- State Observing --
 
 local stateProps = {
 	{ current = 'isLoaded', previous = 'wasLoaded', event = { on = GameSession.Event.Start, off = GameSession.Event.End, scope = GameSession.Scope.Session } },
@@ -83,6 +98,7 @@ local stateProps = {
 	{ current = 'isDead', previous = 'wasWheel', event = { on = GameSession.Event.Death, scope = GameSession.Scope.Death } },
 	{ current = 'timestamp' },
 	{ current = 'timestamps' },
+	{ current = 'sessionKey' },
 }
 
 local previousState = {}
@@ -107,6 +123,10 @@ local function updateDead(isPlayerDead)
 	isDead = isPlayerDead
 end
 
+local function isPreGame()
+	return GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame()
+end
+
 local function refreshCurrentState()
 	local player = Game.GetPlayer()
 	local blackboardDefs = Game.GetAllBlackboardDefs()
@@ -119,7 +139,7 @@ local function refreshCurrentState()
 	local tutorialActive = Game.GetTimeSystem():IsTimeDilationActive('UI_TutorialPopup')
 
 	if not isLoaded then
-		updateLoaded(player:IsAttached() and not GetSingleton('inkMenuScenario'):GetSystemRequestsHandler():IsPreGame())
+		updateLoaded(player:IsAttached() and not isPreGame())
 	end
 
 	updatePaused(menuActive or photoModeActive or tutorialActive)
@@ -214,14 +234,72 @@ local function pushCurrentState()
 	previousState = GameSession.GetState()
 end
 
--- Persistent Session
+-- Session Key --
 
-local sessionDataDir
-local sessionDataRef
-local sessionDataTmpl
-local sessionDataRelaxed = false
+local function generateSessionKey()
+	return os.time()
+end
 
-local function exportSession(t, max, depth)
+local function getSessionKey()
+	return sessionKeyValue
+end
+
+local function setSessionKey(sessionKey)
+	sessionKeyValue = sessionKey
+end
+
+local function isEmptySessionKey(sessionKey)
+	return not sessionKey or sessionKey == 0
+end
+
+local function readSessionKey()
+	return Game.GetQuestsSystem():GetFactStr(sessionKeyFactName)
+end
+
+local function writeSessionKey(sessionKey)
+	Game.GetQuestsSystem():SetFactStr(sessionKeyFactName, sessionKey)
+end
+
+local function initSessionKey()
+	local sessionKey = readSessionKey()
+
+	if isEmptySessionKey(sessionKey) then
+		sessionKey = generateSessionKey()
+		writeSessionKey(sessionKey)
+	end
+
+	setSessionKey(sessionKey)
+end
+
+local function renewSessionKey()
+	local sessionKey = generateSessionKey()
+
+	if sessionKey > readSessionKey() + 1 then
+		writeSessionKey(sessionKey)
+	end
+
+	setSessionKey(sessionKey)
+end
+
+-- Session Meta --
+
+local function getSessionMetaForSaving()
+	return {
+		timestamp = os.time(),
+		sessionKey = getSessionKey(),
+	}
+end
+
+local function getSessionMetaForLoading(saveInfo)
+	return {
+		timestamp = tonumber(saveInfo.timestamp),
+		sessionKey = 0, -- Cannot be retrieved from save metadata
+	}
+end
+
+-- Session Data --
+
+local function exportSessionData(t, max, depth)
 	if type(t) ~= 'table' then
 		return ''
 	end
@@ -246,7 +324,7 @@ local function exportSession(t, max, depth)
 			vstr = string.format('%q', v)
 		elseif vtype == 'table' then
 			if depth < max then
-				vstr = exportSession(v, max, depth + 1)
+				vstr = exportSessionData(v, max, depth + 1)
 			end
 		elseif vtype == 'userdata' then
 			vstr = tostring(v)
@@ -284,39 +362,73 @@ local function exportSession(t, max, depth)
 	return string.format('%s%s}', dumpStr, indent)
 end
 
-local function importSession(s)
+local function importSessionData(s)
 	local chunk = loadstring('return ' .. s, '')
 
 	return chunk and chunk() or {}
 end
 
-local function writeSession(sessionName, sessionData)
+-- Session File IO --
+
+local function findSessionTimestampByKey(targetKey)
+	for _, sessionFile in pairs(dir(sessionDataDir)) do
+		if not sessionFile.name:find('^%.') then
+			local sessionReader = io.open(sessionDataDir .. '/' .. sessionFile.name, 'r')
+			local sessionHeader = sessionReader:read('l')
+			sessionReader:close()
+
+			local sessionKeyStr = sessionHeader:gsub('^-- ', '')
+			if sessionKeyStr:find('^%d+$') then
+				local sessionKey = tonumber(sessionKeyStr)
+				if sessionKey == targetKey then
+					local sessionTimestamp = sessionFile.name:gsub('%.lua$', '')
+					return sessionTimestamp
+				end
+			end
+		end
+	end
+
+	return nil
+end
+
+local function writeSessionFile(sessionTimestamp, sessionKey, sessionData)
 	if not sessionDataDir then
 		return
 	end
 
-	local sessionPath = sessionDataDir .. '/' .. sessionName .. '.lua'
+	local sessionPath = sessionDataDir .. '/' .. sessionTimestamp .. '.lua'
 	local sessionFile = io.open(sessionPath, 'w')
 
 	if not sessionFile then
 		raiseError(('Cannot write session file %q.'):format(sessionPath))
 	end
 
+	sessionFile:write('-- ')
+	sessionFile:write(sessionKey)
+	sessionFile:write('\n')
 	sessionFile:write('return ')
-	sessionFile:write(exportSession(sessionData))
+	sessionFile:write(exportSessionData(sessionData))
 	sessionFile:close()
 end
 
-local function readSession(sessionName)
+local function readSessionFile(sessionTimestamp, sessionKey)
 	if not sessionDataDir then
 		return nil
 	end
 
-	local sessionPath = sessionDataDir .. '/' .. sessionName .. '.lua'
+	if not sessionTimestamp then
+		sessionTimestamp = findSessionTimestampByKey(sessionKey)
+
+		if not sessionTimestamp then
+			return nil
+		end
+	end
+
+	local sessionPath = sessionDataDir .. '/' .. sessionTimestamp .. '.lua'
 	local sessionChunk = loadfile(sessionPath)
 
 	if type(sessionChunk) ~= 'function' then
-		sessionPath = sessionDataDir .. '/' .. (tonumber(sessionName) + 1) .. '.lua'
+		sessionPath = sessionDataDir .. '/' .. (sessionTimestamp + 1) .. '.lua'
 		sessionChunk = loadfile(sessionPath)
 
 		if type(sessionChunk) ~= 'function' then
@@ -327,40 +439,40 @@ local function readSession(sessionName)
 	return sessionChunk()
 end
 
-local function removeSession(sessionName)
+local function removeSessionFile(sessionTimestamp)
 	if not sessionDataDir then
 		return
 	end
 
-	local sessionPath = sessionDataDir .. '/' .. sessionName .. '.lua'
+	local sessionPath = sessionDataDir .. '/' .. sessionTimestamp .. '.lua'
 
 	os.remove(sessionPath)
 end
 
-local function cleanUpSessions(sessionNames)
+local function cleanUpSessionFiles(sessionTimestamps)
 	if not sessionDataDir then
 		return
 	end
 
 	local validNames = {}
 
-	for _, sessionName in ipairs(sessionNames) do
-		validNames[tostring(sessionName)] = true
-		validNames[tostring(sessionName + 1)] = true
+	for _, sessionTimestamp in ipairs(sessionTimestamps) do
+		validNames[tostring(sessionTimestamp)] = true
+		validNames[tostring(sessionTimestamp + 1)] = true
 	end
 
 	for _, sessionFile in pairs(dir(sessionDataDir)) do
 		if not sessionFile.name:find('^%.') then
-			local sessionName = sessionFile.name:gsub('%.lua$', '')
+			local sessionTimestamp = sessionFile.name:gsub('%.lua$', '')
 
-			if not validNames[sessionName] then
-				removeSession(sessionName)
+			if not validNames[sessionTimestamp] then
+				removeSessionFile(sessionTimestamp)
 			end
 		end
 	end
 end
 
--- Initialization
+-- Initialization --
 
 local function initialize(event)
 	if not initialized.data then
@@ -577,10 +689,35 @@ local function initialize(event)
 	-- Saving and Loading
 
 	if required[GameSession.Scope.Saves] and not initialized[GameSession.Scope.Saves] then
-		local saveList
+		local sessionLoadList = {}
+		local sessionLoadRequest = {}
 
-		Observe('LoadGameMenuGameController', 'OnSavesReady', function()
-			saveList = {}
+		if not isPreGame() then
+			initSessionKey()
+		end
+
+		Observe('PlayerPuppet', 'OnTakeControl', function()
+			--spdlog.error(('PlayerPuppet::OnTakeControl()'))
+
+			if not isPreGame() then
+				-- Expand load request with session key from facts
+				sessionLoadRequest.sessionKey = readSessionKey()
+
+				-- Dispatch load event
+				dispatchEvent(GameSession.Event.Load, sessionLoadRequest)
+			end
+
+			-- Reset session load request
+			sessionLoadRequest = {}
+		end)
+
+		Observe('PlayerPuppet', 'OnGameAttached', function()
+			--spdlog.error(('PlayerPuppet::OnGameAttached()'))
+
+			if not isPreGame() then
+				-- Store new session key in facts
+				renewSessionKey()
+			end
 		end)
 
 		Observe('LoadGameMenuGameController', 'OnSaveMetadataReady', function(_, saveInfo)
@@ -588,27 +725,33 @@ local function initialize(event)
 				saveInfo = _
 			end
 
-			saveList[saveInfo.saveIndex] = {
-				timestamp = tonumber(saveInfo.timestamp)
-			}
+			--spdlog.error(('LoadGameMenuGameController::OnSaveMetadataReady()'))
+
+			-- Fill the session list from saves metadata
+			sessionLoadList[saveInfo.saveIndex] = getSessionMetaForLoading(saveInfo)
 		end)
 
 		Observe('LoadGameMenuGameController', 'LoadSaveInGame', function(_, saveIndex)
 			--spdlog.error(('LoadGameMenuGameController::LoadSaveInGame(%d)'):format(saveIndex))
 
-			local timestamp = saveList[saveIndex].timestamp
+			-- Make a load request from selected save
+			sessionLoadRequest = sessionLoadList[saveIndex]
 
-			dispatchEvent(GameSession.Event.Load, { timestamp = timestamp })
-
-			local timestamps = {}
-
-			for _, saveInfo in pairs(saveList) do
-				table.insert(timestamps, saveInfo.timestamp)
+			-- Collect timestamps for existing saves
+			local existingTimestamps = {}
+			for _, sessionMeta in pairs(sessionLoadList) do
+				table.insert(existingTimestamps, sessionMeta.timestamp)
 			end
 
-			dispatchEvent(GameSession.Event.Clean, { timestamps = timestamps })
+			-- Dispatch clean event
+			dispatchEvent(GameSession.Event.Clean, { timestamps = existingTimestamps })
+		end)
 
-			saveList = nil
+		Observe('LoadGameMenuGameController', 'OnUninitialize', function()
+			--spdlog.error(('LoadGameMenuGameController::OnUninitialize()'))
+
+			-- Reset the session list on exit from load screen
+			sessionLoadList = {}
 		end)
 
 		Observe('gameuiInGameMenuGameController', 'OnSavingComplete', function(_, success)
@@ -619,9 +762,11 @@ local function initialize(event)
 			--spdlog.error(('gameuiInGameMenuGameController::OnSavingComplete(%s)'):format(tostring(success)))
 
 			if success then
-				local timestamp = os.time()
+				-- Dispatch
+				dispatchEvent(GameSession.Event.Save, getSessionMetaForSaving())
 
-				dispatchEvent(GameSession.Event.Save, { timestamp = timestamp })
+				-- Store new session key in facts
+				renewSessionKey()
 			end
 		end)
 
@@ -631,22 +776,20 @@ local function initialize(event)
 	-- Persistence
 
 	if required[GameSession.Scope.Persistence] and not initialized[GameSession.Scope.Persistence] then
-		addEventListener(GameSession.Event.Save, function(state)
-			local sessionName = state.timestamp
+		addEventListener(GameSession.Event.Save, function(sessionMeta)
 			local sessionData = sessionDataRef or {}
 
 			dispatchEvent(GameSession.Event.SaveData, sessionData)
 
-			writeSession(sessionName, sessionData)
+			writeSessionFile(sessionMeta.timestamp, sessionMeta.sessionKey, sessionData)
 		end)
 
-		addEventListener(GameSession.Event.Load, function(state)
-			local sessionName = state.timestamp
-			local sessionData = readSession(sessionName)
+		addEventListener(GameSession.Event.Load, function(sessionMeta)
+			local sessionData = readSessionFile(sessionMeta.timestamp, sessionMeta.sessionKey)
 
 			if not sessionData then
 				if sessionDataTmpl then
-					sessionData = importSession(sessionDataTmpl)
+					sessionData = importSessionData(sessionDataTmpl)
 				else
 					sessionData = {}
 				end
@@ -661,8 +804,8 @@ local function initialize(event)
 			end
 		end)
 
-		addEventListener(GameSession.Event.Clean, function(state)
-			cleanUpSessions(state.timestamps)
+		addEventListener(GameSession.Event.Clean, function(sessionMeta)
+			cleanUpSessionFiles(sessionMeta.timestamps)
 		end)
 
 		initialized[GameSession.Scope.Persistence] = true
@@ -678,7 +821,7 @@ local function initialize(event)
 	end
 end
 
--- Public Interface
+-- Public Interface --
 
 function GameSession.Observe(event, callback)
 	if type(event) == 'string' then
@@ -824,7 +967,7 @@ function GameSession.Persist(sessionData, relaxedMode)
 
 	sessionDataRef = sessionData
 	sessionDataRelaxed = relaxedMode and true or false
-	sessionDataTmpl = exportSession(sessionData)
+	sessionDataTmpl = exportSessionData(sessionData)
 
 	initialize(GameSession.Event.SaveData)
 end

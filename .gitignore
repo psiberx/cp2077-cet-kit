@@ -5,4 +5,5 @@
 /export.lua
 /init.lua
 /settings.lua
+/bin
 /mods/GameSession-KillStats/sessions/*.lua
