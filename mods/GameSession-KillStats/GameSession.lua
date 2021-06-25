@@ -7,7 +7,7 @@ Copyright (c) 2021 psiberx
 ]]
 
 local GameSession = {
-	version = '1.2.0',
+	version = '1.2.1',
 	framework = '1.13.0'
 }
 
@@ -371,18 +371,19 @@ end
 -- Session File IO --
 
 local function findSessionTimestampByKey(targetKey)
-	for _, sessionFile in pairs(dir(sessionDataDir)) do
-		if not sessionFile.name:find('^%.') then
-			local sessionReader = io.open(sessionDataDir .. '/' .. sessionFile.name, 'r')
-			local sessionHeader = sessionReader:read('l')
-			sessionReader:close()
+	if sessionDataDir and not isEmptySessionKey(targetKey) then
+		for _, sessionFile in pairs(dir(sessionDataDir)) do
+			if not sessionFile.name:find('^%.') then
+				local sessionReader = io.open(sessionDataDir .. '/' .. sessionFile.name, 'r')
+				local sessionHeader = sessionReader:read('l')
+				sessionReader:close()
 
-			local sessionKeyStr = sessionHeader:gsub('^-- ', '')
-			if sessionKeyStr:find('^%d+$') then
-				local sessionKey = tonumber(sessionKeyStr)
-				if sessionKey == targetKey then
-					local sessionTimestamp = sessionFile.name:gsub('%.lua$', '')
-					return sessionTimestamp
+				local sessionKeyStr = sessionHeader:gsub('^-- ', '')
+				if sessionKeyStr:find('^%d+$') then
+					local sessionKey = tonumber(sessionKeyStr)
+					if sessionKey == targetKey then
+						return tonumber((sessionFile.name:gsub('%.lua$', '')))
+					end
 				end
 			end
 		end
@@ -702,6 +703,11 @@ local function initialize(event)
 			if not isPreGame() then
 				-- Expand load request with session key from facts
 				sessionLoadRequest.sessionKey = readSessionKey()
+
+				-- Try to resolve timestamp from session key
+				if not sessionLoadRequest.timestamp then
+					sessionLoadRequest.timestamp = findSessionTimestampByKey(sessionLoadRequest.sessionKey)
+				end
 
 				-- Dispatch load event
 				dispatchEvent(GameSession.Event.Load, sessionLoadRequest)
