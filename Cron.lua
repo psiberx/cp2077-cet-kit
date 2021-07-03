@@ -5,7 +5,7 @@ Timed Tasks Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local Cron = { version = '1.0.1' }
+local Cron = { version = '1.0.2' }
 
 local timers = {}
 local counter = 0
@@ -20,7 +20,7 @@ local function addTimer(timeout, recurring, callback, args)
 		return
 	end
 
-	if timeout <= 0 then
+	if timeout < 0 then
 		return
 	end
 
@@ -91,6 +91,13 @@ end
 ---@return any
 function Cron.Every(timeout, callback, data)
 	return addTimer(timeout, true, callback, data)
+end
+
+---@param callback function
+---@param data
+---@return any
+function Cron.NextTick(callback, data)
+	return addTimer(0, false, callback, data)
 end
 
 ---@param timerId any
