@@ -4,13 +4,16 @@ GameHUD.lua
 Copyright (c) 2021 psiberx
 ]]
 
-local GameHUD = { version = '0.3.0' }
+local GameHUD = { version = '0.3.1' }
 
 function GameHUD.ShowMessage(text)
-	local message = SimpleScreenMessage.new({
-		message = text,
-		isShown = true
-	})
+	if text == nil or text == "" then
+		return
+	end
+
+	local message = SimpleScreenMessage.new()
+	message.message = text
+	message.isShown = true
 
 	local blackboardDefs = Game.GetAllBlackboardDefs()
 	local blackboardUI = Game.GetBlackboardSystem():Get(blackboardDefs.UI_Notifications)
@@ -23,6 +26,10 @@ function GameHUD.ShowMessage(text)
 end
 
 function GameHUD.ShowWarning(text, duration)
+	if text == nil or text == "" then
+		return
+	end
+
 	PreventionSystem.ShowMessage(text, duration or 5.0)
 end
 
