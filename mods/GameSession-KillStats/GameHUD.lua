@@ -4,34 +4,26 @@ GameHUD.lua
 Copyright (c) 2021 psiberx
 ]]
 
-local GameHUD = { version = '0.2.0' }
-
-local messageController
-
-local function isVehicle()
-	return Game['GetMountedVehicle;GameObject'](Game.GetPlayer()) ~= nil
-end
-
-function GameHUD.Init()
-	Observe('OnscreenMessageGameController', 'CreateAnimations', function(self)
-		messageController = self
-	end)
-end
+local GameHUD = { version = '0.3.0' }
 
 function GameHUD.ShowMessage(text)
-	if messageController and not isVehicle() then
-		local message = NewObject('gameSimpleScreenMessage')
-		message.isShown = true
-		message.duration = 5.0
-		message.message = text
+	local message = SimpleScreenMessage.new({
+		message = text,
+		isShown = true
+	})
 
-		messageController.screenMessage = message
-		messageController:UpdateWidgets()
-	end
+	local blackboardDefs = Game.GetAllBlackboardDefs()
+	local blackboardUI = Game.GetBlackboardSystem():Get(blackboardDefs.UI_Notifications)
+
+	blackboardUI:SetVariant(
+		blackboardDefs.UI_Notifications.OnscreenMessage,
+		ToVariant(message),
+		true
+	)
 end
 
 function GameHUD.ShowWarning(text, duration)
-	Game['PreventionSystem::ShowMessage;GameInstanceStringFloat'](text, duration or 5.0)
+	PreventionSystem.ShowMessage(text, duration or 5.0)
 end
 
 return GameHUD
