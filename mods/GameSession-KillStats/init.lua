@@ -67,6 +67,8 @@ function KillStats.GetTargetGroups(target)
 end
 
 registerForEvent('onInit', function()
+	GameHUD.Initialize()
+
 	GameSession.StoreInDir('sessions')
 	GameSession.Persist(KillStats, true)
 
