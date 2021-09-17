@@ -4,11 +4,12 @@ GameHUD.lua
 Copyright (c) 2021 psiberx
 ]]
 
-local GameHUD = { version = '0.4.0' }
+local GameHUD = { version = '0.4.1' }
 
 function GameHUD.Initialize()
 	-- Fix warning message for patch 1.3
-	if gameGameVersion.Current == gameGameVersion.CP77_Patch_1_3 then
+	local gameVersionNum = EnumValueFromString('gameGameVersion', 'Current')
+	if gameVersionNum >= 1300 and gameVersionNum <= 1301 then
 		Override('WarningMessageGameController', 'UpdateWidgets', function(self)
 			if self.simpleMessage.isShown and self.simpleMessage.message ~= '' then
 				self.root:StopAllAnimations()
@@ -23,7 +24,7 @@ function GameHUD.Initialize()
 				local fakeAnim = inkAnimTransparency.new()
 				fakeAnim:SetStartTransparency(1.00)
 				fakeAnim:SetEndTransparency(1.00)
-				fakeAnim:SetDuration(3.2)
+				fakeAnim:SetDuration(3.1)
 
 				local fakeAnimDef = inkAnimDef.new()
 				fakeAnimDef:AddInterpolator(fakeAnim)
