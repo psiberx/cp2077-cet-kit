@@ -597,7 +597,8 @@ local function initialize(event)
 
 			--spdlog.error(('MenuScenario_HubMenu::OnSelectMenuItem(%q)'):format(menuItemData.menuData.label))
 
-			updateMenuItem(toStudlyCase(menuItemData.menuData.label))
+			updateMenuItem(EnumValueToName('HubMenuItems', menuItemData.menuData.identifier).value)
+			--updateMenuItem(toStudlyCase(menuItemData.menuData.label))
 			notifyObservers()
 		end)
 
