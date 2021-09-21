@@ -43,7 +43,7 @@ function GameHUD.Initialize()
 			self.animProxyShow:Pause()
 			self:SetTimeout(self.simpleMessage.duration)
 		end)
-    end
+	end
 end
 
 function GameHUD.ShowMessage(text)
