@@ -7,8 +7,8 @@ Copyright (c) 2021 psiberx
 ]]
 
 local GameSession = {
-	version = '1.2.2',
-	framework = '1.13.0'
+	version = '1.2.3',
+	framework = '1.16.4'
 }
 
 GameSession.Event = {
@@ -730,12 +730,12 @@ local function initialize(event)
 			end
 		end)
 
-		Observe('LoadGameMenuGameController', 'OnSaveMetadataReady', function(_, saveInfo)
+		Observe('LoadListItem', 'SetMetadata', function(_, saveInfo)
 			if saveInfo == nil then
 				saveInfo = _
 			end
 
-			--spdlog.error(('LoadGameMenuGameController::OnSaveMetadataReady()'))
+			--spdlog.error(('LoadListItem::SetMetadata()'))
 
 			-- Fill the session list from saves metadata
 			sessionLoadList[saveInfo.saveIndex] = getSessionMetaForLoading(saveInfo)
@@ -757,12 +757,14 @@ local function initialize(event)
 			dispatchEvent(GameSession.Event.Clean, { timestamps = existingTimestamps })
 		end)
 
+--[[
 		Observe('LoadGameMenuGameController', 'OnUninitialize', function()
 			--spdlog.error(('LoadGameMenuGameController::OnUninitialize()'))
 
 			-- Reset the session list on exit from load screen
 			sessionLoadList = {}
 		end)
+--]]
 
 		Observe('gameuiInGameMenuGameController', 'OnSavingComplete', function(_, success)
 			if type(success) ~= 'boolean' then
