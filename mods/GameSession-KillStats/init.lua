@@ -73,7 +73,7 @@ registerForEvent('onInit', function()
 	GameSession.Persist(KillStats, true)
 
 	GameSession.OnLoad(function()
-		print('Total Kills: ' .. KillStats.totalKills)
+		print('[KillStats] Total Kills: ' .. KillStats.totalKills)
 	end)
 
 	GameSession.OnStart(function()
@@ -86,7 +86,13 @@ registerForEvent('onInit', function()
 		if kill.confirmed then
 			GameHUD.ShowMessage('Kill #' .. kill.number .. ' ' .. kill.groups[1])
 
-			print('Kill #' .. kill.number .. ' (' .. table.concat(kill.groups, ', ') .. ')')
+			print('[KillStats] Kill #' .. kill.number .. ' (' .. table.concat(kill.groups, ', ') .. ')')
 		end
 	end)
+
+	GameSession.TryLoad()
+end)
+
+registerForEvent('onShutdown', function()
+	GameSession.TrySave()
 end)
