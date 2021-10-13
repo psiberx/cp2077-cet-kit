@@ -7,7 +7,7 @@ Copyright (c) 2021 psiberx
 ]]
 
 local GameSession = {
-	version = '1.2.3',
+	version = '1.3.0',
 	framework = '1.16.4'
 }
 
@@ -249,6 +249,10 @@ local function setSessionKey(sessionKey)
 end
 
 local function isEmptySessionKey(sessionKey)
+	if not sessionKey then
+		sessionKey = getSessionKey()
+	end
+
 	return not sessionKey or sessionKey == 0
 end
 
@@ -279,22 +283,6 @@ local function renewSessionKey()
 	end
 
 	setSessionKey(sessionKey)
-end
-
--- Session Meta --
-
-local function getSessionMetaForSaving()
-	return {
-		timestamp = os.time(),
-		sessionKey = getSessionKey(),
-	}
-end
-
-local function getSessionMetaForLoading(saveInfo)
-	return {
-		timestamp = tonumber(saveInfo.timestamp),
-		sessionKey = 0, -- Cannot be retrieved from save metadata
-	}
 end
 
 -- Session Data --
@@ -370,19 +358,32 @@ end
 
 -- Session File IO --
 
-local function findSessionTimestampByKey(targetKey)
+local function irpairs(tbl)
+	local function iter(t, i)
+		i = i - 1
+		if i ~= 0 then
+			return i, t[i]
+		end
+	end
+
+    return iter, tbl, #tbl + 1
+end
+
+local function findSessionTimestampByKey(targetKey, isTemporary)
 	if sessionDataDir and not isEmptySessionKey(targetKey) then
-		for _, sessionFile in pairs(dir(sessionDataDir)) do
-			if not sessionFile.name:find('^%.') then
+		local pattern = '^' .. (isTemporary and '!' or '') .. '(%d+)%.lua$'
+
+		for _, sessionFile in irpairs(dir(sessionDataDir)) do
+			if sessionFile.name:find(pattern) then
 				local sessionReader = io.open(sessionDataDir .. '/' .. sessionFile.name, 'r')
 				local sessionHeader = sessionReader:read('l')
 				sessionReader:close()
 
-				local sessionKeyStr = sessionHeader:gsub('^-- ', '')
-				if sessionKeyStr:find('^%d+$') then
+				local sessionKeyStr = sessionHeader:match('^-- (%d+)$')
+				if sessionKeyStr then
 					local sessionKey = tonumber(sessionKeyStr)
 					if sessionKey == targetKey then
-						return tonumber((sessionFile.name:gsub('%.lua$', '')))
+						return tonumber((sessionFile.name:match(pattern)))
 					end
 				end
 			end
@@ -392,12 +393,12 @@ local function findSessionTimestampByKey(targetKey)
 	return nil
 end
 
-local function writeSessionFile(sessionTimestamp, sessionKey, sessionData)
+local function writeSessionFile(sessionTimestamp, sessionKey, isTemporary, sessionData)
 	if not sessionDataDir then
 		return
 	end
 
-	local sessionPath = sessionDataDir .. '/' .. sessionTimestamp .. '.lua'
+	local sessionPath = sessionDataDir .. '/' .. (isTemporary and '!' or '') .. sessionTimestamp .. '.lua'
 	local sessionFile = io.open(sessionPath, 'w')
 
 	if not sessionFile then
@@ -412,20 +413,20 @@ local function writeSessionFile(sessionTimestamp, sessionKey, sessionData)
 	sessionFile:close()
 end
 
-local function readSessionFile(sessionTimestamp, sessionKey)
+local function readSessionFile(sessionTimestamp, sessionKey, isTemporary)
 	if not sessionDataDir then
 		return nil
 	end
 
 	if not sessionTimestamp then
-		sessionTimestamp = findSessionTimestampByKey(sessionKey)
+		sessionTimestamp = findSessionTimestampByKey(sessionKey, isTemporary)
 
 		if not sessionTimestamp then
 			return nil
 		end
 	end
 
-	local sessionPath = sessionDataDir .. '/' .. sessionTimestamp .. '.lua'
+	local sessionPath = sessionDataDir .. '/' .. (isTemporary and '!' or '') .. sessionTimestamp .. '.lua'
 	local sessionChunk = loadfile(sessionPath)
 
 	if type(sessionChunk) ~= 'function' then
@@ -440,12 +441,12 @@ local function readSessionFile(sessionTimestamp, sessionKey)
 	return sessionChunk()
 end
 
-local function removeSessionFile(sessionTimestamp)
+local function removeSessionFile(sessionTimestamp, isTemporary)
 	if not sessionDataDir then
 		return
 	end
 
-	local sessionPath = sessionDataDir .. '/' .. sessionTimestamp .. '.lua'
+	local sessionPath = sessionDataDir .. '/' .. (isTemporary and '!' or '') .. sessionTimestamp .. '.lua'
 
 	os.remove(sessionPath)
 end
@@ -463,14 +464,38 @@ local function cleanUpSessionFiles(sessionTimestamps)
 	end
 
 	for _, sessionFile in pairs(dir(sessionDataDir)) do
-		if not sessionFile.name:find('^%.') then
-			local sessionTimestamp = sessionFile.name:gsub('%.lua$', '')
+		local sessionTimestamp = sessionFile.name:match('^!?(%d+)%.lua$')
 
-			if not validNames[sessionTimestamp] then
-				removeSessionFile(sessionTimestamp)
-			end
+		if sessionTimestamp and not validNames[sessionTimestamp] then
+			os.remove(sessionDataDir .. '/' .. sessionFile.name)
 		end
 	end
+end
+
+-- Session Meta --
+
+local function getSessionMetaForSaving(isTemporary)
+	return {
+		sessionKey = getSessionKey(),
+		timestamp = os.time(),
+		isTemporary = isTemporary,
+	}
+end
+
+local function getSessionMetaForLoading(isTemporary)
+	return {
+		sessionKey = getSessionKey(),
+		timestamp = findSessionTimestampByKey(getSessionKey(), isTemporary) or 0,
+		isTemporary = isTemporary,
+	}
+end
+
+local function extractSessionMetaForLoading(saveInfo)
+	return {
+		sessionKey = 0, -- Cannot be retrieved from save metadata
+		timestamp = tonumber(saveInfo.timestamp),
+		isTemporary = false,
+	}
 end
 
 -- Initialization --
@@ -710,7 +735,10 @@ local function initialize(event)
 
 				-- Try to resolve timestamp from session key
 				if not sessionLoadRequest.timestamp then
-					sessionLoadRequest.timestamp = findSessionTimestampByKey(sessionLoadRequest.sessionKey)
+					sessionLoadRequest.timestamp = findSessionTimestampByKey(
+						sessionLoadRequest.sessionKey,
+						sessionLoadRequest.isTemporary
+					)
 				end
 
 				-- Dispatch load event
@@ -738,11 +766,15 @@ local function initialize(event)
 			--spdlog.error(('LoadListItem::SetMetadata()'))
 
 			-- Fill the session list from saves metadata
-			sessionLoadList[saveInfo.saveIndex] = getSessionMetaForLoading(saveInfo)
+			sessionLoadList[saveInfo.saveIndex] = extractSessionMetaForLoading(saveInfo)
 		end)
 
 		Observe('LoadGameMenuGameController', 'LoadSaveInGame', function(_, saveIndex)
 			--spdlog.error(('LoadGameMenuGameController::LoadSaveInGame(%d)'):format(saveIndex))
+
+			if #sessionLoadList == 0 then
+				return
+			end
 
 			-- Make a load request from selected save
 			sessionLoadRequest = sessionLoadList[saveIndex]
@@ -793,11 +825,11 @@ local function initialize(event)
 
 			dispatchEvent(GameSession.Event.SaveData, sessionData)
 
-			writeSessionFile(sessionMeta.timestamp, sessionMeta.sessionKey, sessionData)
+			writeSessionFile(sessionMeta.timestamp, sessionMeta.sessionKey, sessionMeta.isTemporary, sessionData)
 		end)
 
 		addEventListener(GameSession.Event.Load, function(sessionMeta)
-			local sessionData = readSessionFile(sessionMeta.timestamp, sessionMeta.sessionKey)
+			local sessionData = readSessionFile(sessionMeta.timestamp, sessionMeta.sessionKey, sessionMeta.isTemporary)
 
 			if not sessionData then
 				if sessionDataTmpl then
@@ -813,6 +845,10 @@ local function initialize(event)
 				for prop, value in pairs(sessionData) do
 					sessionDataRef[prop] = value
 				end
+			end
+
+			if sessionMeta.isTemporary then
+				removeSessionFile(sessionMeta.timestamp, true)
 			end
 		end)
 
@@ -902,6 +938,10 @@ function GameSession.IsDead()
 	return isDead
 end
 
+function GameSession.GetKey()
+	return getSessionKey()
+end
+
 function GameSession.GetState()
 	local currentState = {}
 
@@ -982,6 +1022,18 @@ function GameSession.Persist(sessionData, relaxedMode)
 	sessionDataTmpl = exportSessionData(sessionData)
 
 	initialize(GameSession.Event.SaveData)
+end
+
+function GameSession.TrySave()
+	if Game.GetSettingsSystem() then
+		dispatchEvent(GameSession.Event.Save, getSessionMetaForSaving(true))
+	end
+end
+
+function GameSession.TryLoad()
+	if not isPreGame() and not isEmptySessionKey() then
+		dispatchEvent(GameSession.Event.Load, getSessionMetaForLoading(true))
+	end
 end
 
 return GameSession
