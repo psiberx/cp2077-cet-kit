@@ -97,7 +97,7 @@ local function isGlobalInput(target)
 end
 
 ---@param handler EventHandler
-local function registerHandler(handler)
+local function registerCallback(handler)
 	if isGlobalInput(handler.target) then
 		handler.target:RegisterToGlobalInputCallback(handler.event, handler.catcher, handler.method)
 	else
@@ -106,7 +106,7 @@ local function registerHandler(handler)
 end
 
 ---@param handler EventHandler
-local function unregisterHandler(handler)
+local function unregisterCallback(handler)
 	if isGlobalInput(handler.target) then
 		handler.target:UnregisterFromGlobalInputCallback(handler.event, handler.catcher, handler.method)
 	else
@@ -171,7 +171,7 @@ local function addEventHandler(proxy, target, event, callback)
 		callback = callback,
 	}
 
-	registerHandler(handler)
+	registerCallback(handler)
 
 	handlers[hash] = handler
 end
@@ -191,7 +191,7 @@ local function removeEventHandler(proxy, target, event, callback)
 		if Ref.IsExpired(handler.catcher) or Ref.IsExpired(handler.target) then
 			handlers[hash] = nil
 		elseif handler.event == event and handler.callback == callback and Ref.Equals(handler.target, target) then
-			unregisterHandler(handler)
+			unregisterCallback(handler)
 			handlers[hash] = nil
 			break
 		end
@@ -202,7 +202,7 @@ local function removeAllEventHandlers()
 	for signature, handlers in pairs(observers) do
 		for hash, handler in pairs(handlers) do
 			if Ref.IsDefined(handler.target) and Ref.IsDefined(handler.catcher) then
-				unregisterHandler(handler)
+				unregisterCallback(handler)
 			end
 			handlers[hash] = nil
 		end

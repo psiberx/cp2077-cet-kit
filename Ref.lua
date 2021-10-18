@@ -62,7 +62,11 @@ function Ref.Strong(o)
 
 	strongMap:Set(0, o)
 
-	return strongMap:Get(0)
+	local ref = strongMap:Get(0)
+
+	strongMap:Set(0, nil)
+
+	return ref
 end
 
 ---@param o IScriptable
