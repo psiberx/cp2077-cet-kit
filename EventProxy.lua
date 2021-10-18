@@ -8,8 +8,47 @@ Copyright (c) 2021 psiberx
 local Cron = require('Cron')
 local Ref = require('Ref')
 
+---@class EventHandler
+---@field catcher IScriptable
+---@field method string
+---@field target IScriptable
+---@field event any
+---@field callback function
+
+---@type table<string, EventHandler[]>
 local observers = {}
-local cleanUpInterval = 30
+
+local cleanUpInterval = 30.0
+
+local knownTypes = {
+	['inkPointerEvent'] = 'sampleStyleManagerGameController::OnState3',
+	['inkWidget'] = 'sampleUISoundsLogicController::OnPress',
+}
+
+local knownEvents = {
+	['OnPress'] = 'inkPointerEvent',
+	['OnRelease'] = 'inkPointerEvent',
+	['OnHold'] = 'inkPointerEvent',
+	['OnRepeat'] = 'inkPointerEvent',
+	['OnRelative'] = 'inkPointerEvent',
+	['OnEnter'] = 'inkPointerEvent',
+	['OnLeave'] = 'inkPointerEvent',
+	['OnHoverOver'] = 'inkPointerEvent',
+	['OnHoverOut'] = 'inkPointerEvent',
+	['OnPreOnPress'] = 'inkPointerEvent',
+	['OnPreOnRelease'] = 'inkPointerEvent',
+	['OnPreOnHold'] = 'inkPointerEvent',
+	['OnPreOnRepeat'] = 'inkPointerEvent',
+	['OnPreOnRelative'] = 'inkPointerEvent',
+	['OnPreOnAxis'] = 'inkPointerEvent',
+	['OnPostOnPress'] = 'inkPointerEvent',
+	['OnPostOnRelease'] = 'inkPointerEvent',
+	['OnPostOnHold'] = 'inkPointerEvent',
+	['OnPostOnRepeat'] = 'inkPointerEvent',
+	['OnPostOnRelative'] = 'inkPointerEvent',
+	['OnPostOnAxis'] = 'inkPointerEvent',
+	['OnLinkPressed'] = 'inkWidget',
+}
 
 ---@param message string
 local function warn(message)
@@ -18,12 +57,75 @@ local function warn(message)
 end
 
 ---@param signature string
+---@return string, string
+local function parseSignature(signature)
+	return signature:match('^(.+)::(.+)$')
+end
+
+---@param event string
+---@return string, string|nil
+local function parseProxyEvent(event)
+	return event:match('^(.+)@(.+)$') or event, nil
+end
+
+---@param proxy string
+---@return string
+local function resolveProxyByType(proxy)
+	return knownTypes[proxy] or proxy
+end
+
+---@param proxy string
+---@return string, string
+local function resolveProxyByEvent(proxy)
+	local event, type = parseProxyEvent(proxy)
+
+	if not type then
+		type = knownEvents[event]
+
+		if not type then
+			type = 'inkWidget' -- Fallback to custom callback
+		end
+	end
+
+	return resolveProxyByType(type), event
+end
+
+---@param target IScriptable
+---@return boolean
+local function isGlobalInput(target)
+	return target:IsA('gameuiWidgetGameController') or target:IsA('inkWidgetLogicController')
+end
+
+---@param handler EventHandler
+local function registerHandler(handler)
+	if isGlobalInput(handler.target) then
+		handler.target:RegisterToGlobalInputCallback(handler.event, handler.catcher, handler.method)
+	else
+		handler.target:RegisterToCallback(handler.event, handler.catcher, handler.method)
+	end
+end
+
+---@param handler EventHandler
+local function unregisterHandler(handler)
+	if isGlobalInput(handler.target) then
+		handler.target:UnregisterFromGlobalInputCallback(handler.event, handler.catcher, handler.method)
+	else
+		handler.target:UnregisterFromCallback(handler.event, handler.catcher, handler.method)
+	end
+end
+
+---@param proxy string
 ---@param target IScriptable
 ---@param event string
 ---@param callback function
-local function addEventHandler(signature, target, event, callback)
-	local class, method = signature:match('^(.+)::(.+)$')
-	local handlers = observers[signature]
+local function addEventHandler(proxy, target, event, callback)
+	local class, method = parseSignature(proxy)
+
+	if not class then
+		return
+	end
+
+	local handlers = observers[proxy]
 
 	if not handlers then
 		handlers = {}
@@ -32,7 +134,7 @@ local function addEventHandler(signature, target, event, callback)
 			local hash = Ref.Hash(self)
 
 			if handlers[hash] then
-				handlers[hash].callback(self, select(1, ...))
+				handlers[hash].callback(handlers[hash].target, select(1, ...))
 			end
 		end
 
@@ -51,33 +153,35 @@ local function addEventHandler(signature, target, event, callback)
 			end
 		end)
 
-		observers[signature] = handlers
+		observers[proxy] = handlers
 	end
 
 	local catcher = NewObject(class)
 	local hash = Ref.Hash(catcher)
 
 	if handlers[hash] then
-		warn(('[EventProxy] %s: Hash conflict %08X '):format(signature, hash))
+		warn(('[EventProxy] %s: Hash conflict %08X '):format(proxy, hash))
 	end
 
-	target:RegisterToCallback(event, catcher, method)
-
-	handlers[hash] = {
+	local handler = {
 		catcher = catcher,
 		method = method,
 		target = Ref.Weak(target),
 		event = event,
 		callback = callback,
 	}
+
+	registerHandler(handler)
+
+	handlers[hash] = handler
 end
 
----@param signature string
+---@param proxy string
 ---@param target IScriptable
 ---@param event string
 ---@param callback function
-local function removeEventHandler(signature, target, event, callback)
-	local handlers = observers[signature]
+local function removeEventHandler(proxy, target, event, callback)
+	local handlers = observers[proxy]
 
 	if not handlers then
 		return
@@ -87,7 +191,7 @@ local function removeEventHandler(signature, target, event, callback)
 		if Ref.IsExpired(handler.catcher) or Ref.IsExpired(handler.target) then
 			handlers[hash] = nil
 		elseif handler.event == event and handler.callback == callback and Ref.Equals(handler.target, target) then
-			handler.target:UnregisterFromCallback(handler.event, handler.catcher, handler.method)
+			unregisterHandler(handler)
 			handlers[hash] = nil
 			break
 		end
@@ -98,7 +202,7 @@ local function removeAllEventHandlers()
 	for signature, handlers in pairs(observers) do
 		for hash, handler in pairs(handlers) do
 			if Ref.IsDefined(handler.target) and Ref.IsDefined(handler.catcher) then
-				handler.target:UnregisterFromCallback(handler.event, handler.catcher, handler.method)
+				unregisterHandler(handler)
 			end
 			handlers[hash] = nil
 		end
@@ -106,55 +210,70 @@ local function removeAllEventHandlers()
 	end
 end
 
-local EventProxy = {}
+local EventProxy = { version = '1.0.1' }
 
-EventProxy.Type = {
-	['inkPointerEvent'] = 'sampleStyleManagerGameController::OnState3',
-	['inkWidget'] = 'sampleUISoundsLogicController::OnPress',
-}
+---@type table<string, string>
+EventProxy.Type = knownTypes
+
+---@type table<string, string>
+EventProxy.Event = knownEvents
+
+---@param type string
+---@param proxy string
+function EventProxy.RegisterProxy(type, proxy)
+	knownTypes[type] = proxy
+end
+
+---@param event string
+---@param type string
+function EventProxy.RegisterEvent(event, type)
+	knownEvents[event] = type
+end
+
+---@param target IScriptable
+---@param event string
+---@param callback function
+function EventProxy.RegisterCallback(target, event, callback)
+	local _proxy, _event = resolveProxyByEvent(event)
+
+	addEventHandler(_proxy, target, _event, callback)
+end
+
+---@param target IScriptable
+---@param event string
+---@param callback function
+function EventProxy.UnregisteCallback(target, event, callback)
+	local _proxy, _event = resolveProxyByEvent(event)
+
+	removeEventHandler(_proxy, target, _event, callback)
+end
 
 ---@param target IScriptable
 ---@param event string
 ---@param callback function
 function EventProxy.RegisterPointerCallback(target, event, callback)
-	addEventHandler(EventProxy.Type.inkPointerEvent, target, event, callback)
+	addEventHandler(knownTypes.inkPointerEvent, target, event, callback)
 end
 
 ---@param target IScriptable
 ---@param event string
 ---@param callback function
 function EventProxy.UnregisterPointerCallback(target, event, callback)
-	removeEventHandler(EventProxy.Type.inkPointerEvent, target, event, callback)
+	removeEventHandler(knownTypes.inkPointerEvent, target, event, callback)
 end
 
 ---@param target IScriptable
 ---@param event string
 ---@param callback function
-function EventProxy.RegisterWidgetCallback(target, event, callback)
-	addEventHandler(EventProxy.Type.inkWidget, target, event, callback)
+function EventProxy.RegisterCustomCallback(target, event, callback)
+	addEventHandler(knownTypes.inkWidget, target, event, callback)
 end
 
 ---@param target IScriptable
 ---@param event string
 ---@param callback function
-function EventProxy.UnregisterWidgetCallback(target, event, callback)
-	removeEventHandler(EventProxy.Type.inkWidget, target, event, callback)
-end
-
----@param target IScriptable
----@param event string
----@param proxy string
----@param callback function
-function EventProxy.RegisterCallback(target, event, proxy, callback)
-	addEventHandler(EventProxy.Type[proxy] or proxy, target, event, callback)
-end
-
----@param target IScriptable
----@param event string
----@param proxy string
----@param callback function
-function EventProxy.UnregisteCallback(target, event, proxy, callback)
-	removeEventHandler(EventProxy.Type[proxy] or proxy, target, event, callback)
+function EventProxy.UnregisterCustomCallback(target, event, callback)
+	removeEventHandler(knownTypes.inkWidget, target, event, callback)
 end
 
 function EventProxy.UnregisterAllCallbacks()
