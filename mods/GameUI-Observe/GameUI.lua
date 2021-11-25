@@ -16,7 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.1.5' }
+local GameUI = { version = '1.1.6' }
 
 GameUI.Event = {
 	Braindance = 'Braindance',
@@ -953,38 +953,34 @@ local function initialize(event)
 		initialized[GameUI.Event.Johnny] = true
 	end
 
-	-- Johnny
+	-- Cyberspace
 
 	if required[GameUI.Event.Cyberspace] and not initialized[GameUI.Event.Cyberspace] then
 		Observe('PlayerPuppet', 'OnStatusEffectApplied', function(_, evt)
-			if type(evt) ~= 'userdata' then
-				evt = _
-			end
-
 			--spdlog.error(('PlayerPuppet::OnStatusEffectApplied()'))
 
-			local applyCyberspacePresence = evt.staticData:GameplayTagsContains('CyberspacePresence')
+			if evt.staticData then
+				local applyCyberspacePresence = evt.staticData:GameplayTagsContains('CyberspacePresence')
 
-			if applyCyberspacePresence then
-				notifyAfterStart(function()
-					updateCyberspace(true)
-				end)
+				if applyCyberspacePresence then
+					notifyAfterStart(function()
+						updateCyberspace(true)
+					end)
+				end
 			end
 		end)
 
 		Observe('PlayerPuppet', 'OnStatusEffectRemoved', function(_, evt)
-			if type(evt) ~= 'userdata' then
-				evt = _
-			end
-
 			--spdlog.error(('PlayerPuppet::OnStatusEffectRemoved()'))
 
-			local removeCyberspacePresence = evt.staticData:GameplayTagsContains('CyberspacePresence')
+			if evt.staticData then
+				local removeCyberspacePresence = evt.staticData:GameplayTagsContains('CyberspacePresence')
 
-			if removeCyberspacePresence then
-				notifyAfterStart(function()
-					updateCyberspace(false)
-				end)
+				if removeCyberspacePresence then
+					notifyAfterStart(function()
+						updateCyberspace(false)
+					end)
+				end
 			end
 		end)
 
