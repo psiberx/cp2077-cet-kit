@@ -16,7 +16,7 @@ end)
 ```
 ]]
 
-local GameUI = { version = '1.1.6' }
+local GameUI = { version = '1.1.7' }
 
 GameUI.Event = {
 	Braindance = 'Braindance',
@@ -540,18 +540,15 @@ local function initialize(event)
 	-- Loading State Listeners
 
 	if required[GameUI.Event.Loading] and not initialized[GameUI.Event.Loading] then
-		Observe('LoadingScreenProgressBarController', 'OnInitialize', function()
-			--spdlog.error(('LoadingScreenProgressBarController::OnInitialize()'))
-
-			updateMenuScenario()
-			updateLoading(true)
-			notifyObservers()
-		end)
-
 		Observe('LoadingScreenProgressBarController', 'SetProgress', function(_, progress)
 			--spdlog.info(('LoadingScreenProgressBarController::SetProgress(%.3f)'):format(progress))
 
-			if progress == 1.0 then
+			if not isLoading then
+				updateMenuScenario()
+				updateLoading(true)
+				notifyObservers()
+
+			elseif progress == 1.0 then
 				if currentMenu ~= 'MainMenu' then
 					updateMenuScenario()
 				end
