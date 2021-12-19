@@ -7,7 +7,7 @@ Copyright (c) 2021 psiberx
 ]]
 
 local GameSession = {
-	version = '1.3.1',
+	version = '1.3.2',
 	framework = '1.16.4'
 }
 
@@ -296,16 +296,18 @@ end
 
 -- Session Data --
 
-local function exportSessionData(t, max, depth)
+local function exportSessionData(t, max, depth, result)
 	if type(t) ~= 'table' then
-		return ''
+		return '{}'
 	end
 
 	max = max or 63
 	depth = depth or 0
 
-	local dumpStr = '{\n'
 	local indent = string.rep('\t', depth)
+	local output = result or {}
+
+	table.insert(output, '{\n')
 
 	for k, v in pairs(t) do
 		local ktype = type(k)
@@ -321,7 +323,9 @@ local function exportSessionData(t, max, depth)
 			vstr = string.format('%q', v)
 		elseif vtype == 'table' then
 			if depth < max then
-				vstr = exportSessionData(v, max, depth + 1)
+				table.insert(output, string.format('\t%s%s', indent, kstr))
+				exportSessionData(v, max, depth + 1, output)
+				table.insert(output, ',\n')
 			end
 		elseif vtype == 'userdata' then
 			vstr = tostring(v)
@@ -352,11 +356,19 @@ local function exportSessionData(t, max, depth)
 		end
 
 		if vstr ~= '' then
-			dumpStr = string.format('%s\t%s%s%s,\n', dumpStr, indent, kstr, vstr)
+			table.insert(output, string.format('\t%s%s%s,\n', indent, kstr, vstr))
 		end
 	end
 
-	return string.format('%s%s}', dumpStr, indent)
+	if not result and #output == 1 then
+		return '{}'
+	end
+
+	table.insert(output, indent .. '}')
+
+	if not result then
+		return table.concat(output)
+	end
 end
 
 local function importSessionData(s)
