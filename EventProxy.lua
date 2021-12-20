@@ -31,6 +31,7 @@ local knownEvents = {
 	['OnHold'] = 'inkPointerEvent',
 	['OnRepeat'] = 'inkPointerEvent',
 	['OnRelative'] = 'inkPointerEvent',
+	['OnAxis'] = 'inkPointerEvent',
 	['OnEnter'] = 'inkPointerEvent',
 	['OnLeave'] = 'inkPointerEvent',
 	['OnHoverOver'] = 'inkPointerEvent',
@@ -210,7 +211,7 @@ local function removeAllEventHandlers()
 	end
 end
 
-local EventProxy = { version = '1.0.1' }
+local EventProxy = { version = '1.0.2' }
 
 ---@type table<string, string>
 EventProxy.Type = knownTypes
