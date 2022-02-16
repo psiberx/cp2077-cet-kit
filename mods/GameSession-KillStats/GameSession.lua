@@ -7,8 +7,8 @@ Copyright (c) 2021 psiberx
 ]]
 
 local GameSession = {
-	version = '1.3.2',
-	framework = '1.16.4'
+	version = '1.4.0',
+	framework = '1.19.0'
 }
 
 GameSession.Event = {
@@ -621,12 +621,12 @@ local function initialize(event)
 			notifyObservers()
 		end)
 
-		Observe('FastTravelSystem', 'OnToggleFastTravelAvailabilityOnMapRequest', function(_, request)
+		Observe('FastTravelSystem', 'OnUpdateFastTravelPointRecordRequest', function(_, request)
 			if request == nil then
 				request = _
 			end
 
-			--spdlog.error(('FastTravelSystem::OnToggleFastTravelAvailabilityOnMapRequest()'))
+			--spdlog.error(('FastTravelSystem::OnUpdateFastTravelPointRecordRequest()'))
 
 			if request.isEnabled then
 				fastTravelStart = request.pointRecord
