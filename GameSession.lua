@@ -7,7 +7,7 @@ Copyright (c) 2021 psiberx
 ]]
 
 local GameSession = {
-    version = '1.4.2',
+    version = '1.4.3',
     framework = '1.19.0'
 }
 
@@ -464,6 +464,14 @@ local function readSessionFile(sessionTimestamp, sessionKey, isTemporary)
     return sessionChunk()
 end
 
+local function writeSessionFileFor(sessionMeta, sessionData)
+    writeSessionFile(sessionMeta.timestamp, sessionMeta.sessionKey, sessionMeta.isTemporary, sessionData)
+end
+
+local function readSessionFileFor(sessionMeta)
+    return readSessionFile(sessionMeta.timestamp, sessionMeta.sessionKey, sessionMeta.isTemporary)
+end
+
 local function removeSessionFile(sessionTimestamp, isTemporary)
     if not sessionDataDir then
         return
@@ -849,23 +857,28 @@ local function initialize(event)
 
             dispatchEvent(GameSession.Event.SaveData, sessionData)
 
-            writeSessionFile(sessionMeta.timestamp, sessionMeta.sessionKey, sessionMeta.isTemporary, sessionData)
+            writeSessionFileFor(sessionMeta, sessionData)
         end)
 
         addEventListener(GameSession.Event.Load, function(sessionMeta)
-            local sessionData = readSessionFile(sessionMeta.timestamp, sessionMeta.sessionKey, sessionMeta.isTemporary)
+            local sessionData = readSessionFileFor(sessionMeta) or {}
 
-            if not sessionData then
-                if sessionDataTmpl then
-                    sessionData = importSessionData(sessionDataTmpl)
-                else
-                    sessionData = {}
+            if sessionDataTmpl then
+                local defaultData = importSessionData(sessionDataTmpl)
+                for prop, value in pairs(defaultData) do
+                    if sessionData[prop] == nil then
+                        sessionData[prop] = value
+                    end
                 end
             end
 
             dispatchEvent(GameSession.Event.LoadData, sessionData)
 
             if sessionDataRef then
+                for prop, _ in pairs(sessionDataRef) do
+                    sessionDataRef[prop] = nil
+                end
+
                 for prop, value in pairs(sessionData) do
                     sessionDataRef[prop] = value
                 end
