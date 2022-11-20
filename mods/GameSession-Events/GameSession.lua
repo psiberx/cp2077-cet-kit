@@ -7,7 +7,7 @@ Copyright (c) 2021 psiberx
 ]]
 
 local GameSession = {
-    version = '1.4.3',
+    version = '1.4.4',
     framework = '1.19.0'
 }
 
@@ -932,6 +932,7 @@ end
 
 function GameSession.Listen(event, callback)
     if type(event) == 'function' then
+        initialize(GameSession.Event.Update)
         callback = event
         for _, evt in pairs(GameSession.Event) do
             if evt ~= GameSession.Event.Update and not eventScopes[evt][GameSession.Scope.Persistence] then
