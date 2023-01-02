@@ -17,7 +17,7 @@ end)
 ]]
 
 local GameUI = {
-	version = '1.2.1',
+	version = '1.2.2',
 	framework = '1.19.0'
 }
 
@@ -792,24 +792,16 @@ local function initialize(event)
 		local fastTravelStart
 
 		Observe('FastTravelSystem', 'OnUpdateFastTravelPointRecordRequest', function(_, request)
-			if type(request) ~= 'userdata' then
-				request = _
-			end
-
 			--spdlog.error(('FastTravelSystem::OnUpdateFastTravelPointRecordRequest()'))
 
             fastTravelStart = request.pointRecord
 		end)
 
 		Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(self, request)
-			if type(request) ~= 'userdata' then
-				request = _
-			end
-
 			--spdlog.error(('FastTravelSystem::OnPerformFastTravelRequest()'))
 
 			if self.isFastTravelEnabledOnMap then
-                local fastTravelDestination = request.pointData.pointRecord
+                local fastTravelDestination = request.pointData and request.pointData.pointRecord or nil
 
                 if tostring(fastTravelStart) ~= tostring(fastTravelDestination) then
                     updateLoading(true)
@@ -820,10 +812,6 @@ local function initialize(event)
 		end)
 
 		Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(_, finished)
-			if type(finished) ~= 'boolean' then
-				finished = _
-			end
-
 			--spdlog.error(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
 
 			if isFastTravel and finished then

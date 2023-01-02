@@ -7,3 +7,4 @@
 /settings.lua
 /bin
 /mods/GameSession-KillStats/sessions/*.lua
+/mods/GameSession-Reload/sessions/*.lua

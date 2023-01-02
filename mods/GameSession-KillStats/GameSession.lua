@@ -7,7 +7,7 @@ Copyright (c) 2021 psiberx
 ]]
 
 local GameSession = {
-    version = '1.4.4',
+    version = '1.4.5',
     framework = '1.19.0'
 }
 
@@ -598,10 +598,6 @@ local function initialize(event)
         local fastTravelActive, fastTravelStart
 
         Observe('gameuiPopupsManager', 'OnMenuUpdate', function(_, isInMenu)
-            if isInMenu == nil then
-                isInMenu = _
-            end
-
             --spdlog.error(('gameuiPopupsManager::OnMenuUpdate(%s)'):format(tostring(isInMenu)))
 
             if not fastTravelActive then
@@ -632,24 +628,16 @@ local function initialize(event)
         end)
 
         Observe('FastTravelSystem', 'OnUpdateFastTravelPointRecordRequest', function(_, request)
-            if type(request) ~= 'userdata' then
-                request = _
-            end
-
             --spdlog.error(('FastTravelSystem::OnUpdateFastTravelPointRecordRequest()'))
 
             fastTravelStart = request.pointRecord
         end)
 
-        Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(_, request)
-            if request == nil then
-                request = _
-            end
-
+        Observe('FastTravelSystem', 'OnPerformFastTravelRequest', function(self, request)
             --spdlog.error(('FastTravelSystem::OnPerformFastTravelRequest()'))
 
             if self.isFastTravelEnabledOnMap then
-                local fastTravelDestination = request.pointData.pointRecord
+                local fastTravelDestination = request.pointData and request.pointData.pointRecord or nil
 
                 if tostring(fastTravelStart) ~= tostring(fastTravelDestination) then
                     fastTravelActive = true
@@ -660,10 +648,6 @@ local function initialize(event)
         end)
 
         Observe('FastTravelSystem', 'OnLoadingScreenFinished', function(_, finished)
-            if finished == nil then
-                finished = _
-            end
-
             --spdlog.error(('FastTravelSystem::OnLoadingScreenFinished(%s)'):format(tostring(finished)))
 
             if finished then
