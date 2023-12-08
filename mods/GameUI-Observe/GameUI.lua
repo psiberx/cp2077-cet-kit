@@ -17,8 +17,8 @@ end)
 ]]
 
 local GameUI = {
-	version = '1.2.2',
-	framework = '1.19.0'
+	version = '1.2.3',
+	framework = '1.29.0'
 }
 
 GameUI.Event = {
@@ -176,6 +176,9 @@ local menuScenarios = {
 	['MenuScenario_CharacterCustomization'] = { menu = 'NewGame', submenu = 'Customization' },
 	['MenuScenario_ClippedMenu'] = { menu = 'ClippedMenu', submenu = false },
 	['MenuScenario_Credits'] = { menu = 'MainMenu', submenu = 'Credits' },
+	['MenuScenario_CreditsE1'] = { menu = 'MainMenu', submenu = 'Credits' },
+	['MenuScenario_CreditsPicker'] = { menu = 'MainMenu', submenu = 'Credits' },
+	['MenuScenario_CreditsPickerPause'] = { menu = 'PauseMenu', submenu = 'Credits' },
 	['MenuScenario_DeathMenu'] = { menu = 'DeathMenu', submenu = false },
 	['MenuScenario_Difficulty'] = { menu = 'NewGame', submenu = 'Difficulty' },
 	['MenuScenario_E3EndMenu'] = { menu = 'E3EndMenu', submenu = false },
@@ -623,7 +626,7 @@ local function initialize(event)
 			['MenuScenario_PauseMenu'] = {
 				['OnSwitchToBrightnessSettings'] = 'Brightness',
 				['OnSwitchToControllerPanel'] = 'Controller',
-				['OnSwitchToCredits'] = 'Credits',
+				['OnCreditsPicker'] = 'Credits',
 				['OnSwitchToHDRSettings'] = 'HDR',
 				['OnSwitchToLoadGame'] = 'LoadGame',
 				['OnSwitchToSaveGame'] = 'SaveGame',
