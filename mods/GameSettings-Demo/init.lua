@@ -14,6 +14,10 @@ registerHotkey('SwitchFOV', 'Switch FOV', function()
 	end
 
 	GameSettings.Set('/graphics/basic/FieldOfView', fov.value)
+		
+	if GameSettings.NeedsConfirmation() then
+		GameSettings.Confirm()
+	end
 	
 	print(('Current FOV: %.1f'):format(GameSettings.Get('/graphics/basic/FieldOfView')))
 end)
