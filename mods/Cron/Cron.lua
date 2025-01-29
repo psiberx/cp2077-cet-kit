@@ -5,10 +5,11 @@ Timed Tasks Manager
 Copyright (c) 2021 psiberx
 ]]
 
-local Cron = { version = '1.0.2' }
+local Cron = { version = '1.0.3' }
 
 local timers = {}
 local counter = 0
+local prune = false
 
 ---@param timeout number
 ---@param recurring boolean
@@ -48,6 +49,7 @@ local function addTimer(timeout, recurring, callback, args)
         recurring = recurring,
         timeout = timeout,
         active = true,
+        halted = false,
         delay = timeout,
         args = args,
     }
@@ -107,9 +109,11 @@ function Cron.Halt(timerId)
         timerId = timerId.id
     end
 
-    for i, timer in ipairs(timers) do
+    for _, timer in ipairs(timers) do
         if timer.id == timerId then
-            table.remove(timers, i)
+            timer.active = false
+            timer.halted = true
+            prune = true
             break
         end
     end
@@ -124,7 +128,9 @@ function Cron.Pause(timerId)
 
     for _, timer in ipairs(timers) do
         if timer.id == timerId then
-            timer.active = false
+            if not timer.halted then
+                timer.active = false
+            end
             break
         end
     end
@@ -139,7 +145,9 @@ function Cron.Resume(timerId)
 
     for _, timer in ipairs(timers) do
         if timer.id == timerId then
-            timer.active = true
+            if not timer.halted then
+                timer.active = true
+            end
             break
         end
     end
@@ -148,21 +156,33 @@ end
 ---@param delta number
 ---@return void
 function Cron.Update(delta)
-    if #timers > 0 then
-        for i, timer in ipairs(timers) do
-            if timer.active then
-                timer.delay = timer.delay - delta
+    if #timers == 0 then
+        return
+    end
 
-                if timer.delay <= 0 then
-                    if timer.recurring then
-                        timer.delay = timer.delay + timer.timeout
-                    else
-                        table.remove(timers, i)
-                        i = i - 1
-                    end
+    for _, timer in ipairs(timers) do
+        if timer.active then
+            timer.delay = timer.delay - delta
 
-                    timer.callback(timer.args)
+            if timer.delay <= 0 then
+                if timer.recurring then
+                    timer.delay = timer.delay + timer.timeout
+                else
+                    timer.active = false
+                    timer.halted = true
+                    prune = true
                 end
+
+                timer.callback(timer.args)
+            end
+        end
+    end
+
+    if prune then
+        prune = false
+        for i = #timers, 1, -1 do
+            if timers[i].halted then
+                table.remove(timers, i)
             end
         end
     end
